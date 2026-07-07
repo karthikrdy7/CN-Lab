@@ -163,6 +163,24 @@
     transition: all 0.15s;
   }
 
+  .network-node::after {
+    content: '';
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: var(--cyan);
+    border-radius: 50%;
+    top: -4px;
+    right: -4px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    box-shadow: 0 0 6px var(--cyan);
+  }
+
+  .network-node:hover::after {
+    opacity: 0.6;
+  }
+
   .network-node:hover {
     border-color: var(--cyan);
     box-shadow: 0 0 12px rgba(76, 201, 240, 0.3);
@@ -176,6 +194,17 @@
   .network-node.dragging {
     opacity: 0.7;
     z-index: 1000;
+  }
+
+  .network-node.connecting {
+    border-color: var(--amber);
+  }
+
+  .temp-connection-line {
+    stroke: var(--amber);
+    stroke-width: 2;
+    stroke-dasharray: 4 4;
+    opacity: 0.7;
   }
 
   .node-emoji {
@@ -390,6 +419,20 @@
     letter-spacing: 0.05em;
     margin-top: 0.3rem;
   }
+
+  .quick-tip {
+    background: linear-gradient(135deg, var(--cyan-dim), var(--green-dim));
+    border: 1px solid var(--cyan);
+    border-radius: var(--radius-sm);
+    padding: 0.8rem 1rem;
+    margin-bottom: 1.6rem;
+    font-size: 0.9rem;
+    color: var(--text-1);
+  }
+
+  .quick-tip strong {
+    color: var(--cyan);
+  }
 </style>
 </head>
 <body>
@@ -399,6 +442,10 @@
     <div class="page-eyebrow">// interactive lab</div>
     <h1>Network Lab</h1>
     <p class="lede">Build your own network by dragging devices onto the canvas. Create topologies, visualize connections, and understand how real networks are structured.</p>
+
+    <div class="quick-tip">
+      <strong>⚡ Speed Tip:</strong> Hold <strong>Shift</strong> and drag between devices to instantly create cables — no need for the Connect button!
+    </div>
 
     <div class="lab-container">
       <!-- Device Palette -->
@@ -574,6 +621,8 @@ let nodeIdCounter = 0;
 let connectMode = false;
 let selectedNode = null;
 let pendingConnection = null;
+let dragFromNode = null;
+let tempLine = null;
 
 const canvasContent = document.getElementById('canvasContent');
 const connectionsSvg = document.getElementById('connectionsSvg');
@@ -687,6 +736,13 @@ function addNode(type, emoji, x, y) {
       handleConnectionMode(id);
       return;
     }
+    
+    // Check if this is a connection drag (hold Shift)
+    if (e.shiftKey) {
+      startConnectionDrag(id, e);
+      return;
+    }
+    
     dragNode(nodeEl, node, e);
   });
 
@@ -699,6 +755,83 @@ function addNode(type, emoji, x, y) {
   canvasContent.appendChild(nodeEl);
   updateStats();
   removeEmptyState();
+}
+
+function startConnectionDrag(fromId, e) {
+  dragFromNode = fromId;
+  const fromNode = nodes.find(n => n.id === fromId);
+  const nodeEl = document.querySelector(`[data-id="${fromId}"]`);
+  nodeEl.classList.add('connecting');
+  
+  const startX = fromNode.x + 45;
+  const startY = fromNode.y + 45;
+  
+  tempLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  tempLine.setAttribute('x1', startX);
+  tempLine.setAttribute('y1', startY);
+  tempLine.setAttribute('class', 'temp-connection-line');
+  connectionsSvg.appendChild(tempLine);
+
+  function onMouseMove(e) {
+    const rect = canvasContent.getBoundingClientRect();
+    tempLine.setAttribute('x2', e.clientX - rect.left);
+    tempLine.setAttribute('y2', e.clientY - rect.top);
+  }
+
+  function onMouseUp(e) {
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    nodeEl.classList.remove('connecting');
+    
+    if (tempLine) {
+      tempLine.remove();
+      tempLine = null;
+    }
+
+    // Check if released over another node
+    const rect = canvasContent.getBoundingClientRect();
+    const endX = e.clientX - rect.left;
+    const endY = e.clientY - rect.top;
+
+    for (let node of nodes) {
+      if (node.id === fromId) continue;
+      if (endX >= node.x && endX <= node.x + 90 &&
+          endY >= node.y && endY <= node.y + 90) {
+        // Found target node
+        const fromNode = nodes.find(n => n.id === fromId);
+        const toNode = node;
+        
+        const exists = connections.some(c => 
+          (c.from === fromId && c.to === node.id) || 
+          (c.from === node.id && c.to === fromId)
+        );
+        
+        if (exists) {
+          alert('Connection already exists!');
+          return;
+        }
+
+        const availableCables = getAvailableCables(fromNode.type, toNode.type);
+        
+        if (availableCables.length === 0) {
+          alert(`Cannot connect ${deviceLabels[fromNode.type]} to ${deviceLabels[toNode.type]} - incompatible!`);
+          return;
+        }
+
+        if (availableCables.length === 1) {
+          addConnection(fromId, node.id, availableCables[0]);
+        } else {
+          showCableTypeSelector(fromId, node.id, availableCables, e);
+        }
+        return;
+      }
+    }
+    
+    dragFromNode = null;
+  }
+
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', onMouseUp);
 }
 
 function dragNode(el, node, e) {
