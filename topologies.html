@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Network Topologies — NETSTACK</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .topo-tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 1.2rem 0; }
+  .topo-tab {
+    font-family: var(--mono); font-size: 0.82rem;
+    padding: 0.5rem 1rem; border-radius: var(--radius-sm);
+    border: 1px solid var(--border-hi); color: var(--text-2); cursor: pointer; background: var(--bg-panel);
+  }
+  .topo-tab.active { color: var(--cyan); border-color: var(--cyan); background: var(--cyan-dim); }
+  .topo-svg-wrap { display: flex; justify-content: center; }
+  .topo-node circle { transition: fill 0.2s, stroke 0.2s; cursor: pointer; }
+  .topo-node text { font-family: var(--mono); font-size: 10px; fill: var(--text-2); pointer-events: none; }
+  .topo-edge { stroke: var(--border-hi); stroke-width: 2; transition: stroke 0.2s, opacity 0.2s; }
+  .legend { display: flex; gap: 1.2rem; justify-content: center; margin-top: 0.6rem; font-family: var(--mono); font-size: 0.78rem; color: var(--text-3); }
+  .legend span { display:flex; align-items:center; gap:0.4rem; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display:inline-block; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar-slot"></aside>
+  <main>
+    <div class="page-eyebrow">// module 03</div>
+    <h1>Network Topologies</h1>
+    <p class="lede">Topology is just the shape devices are wired in. The shape decides what happens when one device or cable fails — some layouts shrug it off, others take the whole network down. Pick a shape below, then click a node to simulate it failing.</p>
+
+    <div class="topo-tabs" id="tabs"></div>
+
+    <div class="panel">
+      <div class="topo-svg-wrap"><svg id="topoSvg" viewBox="0 0 480 320" width="100%" style="max-width:520px"></svg></div>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--green)"></span> reachable</span>
+        <span><span class="dot" style="background:var(--red)"></span> failed (click to toggle)</span>
+        <span><span class="dot" style="background:var(--text-3)"></span> disconnected</span>
+      </div>
+      <p id="topoCaption" class="lede" style="text-align:center; margin-top:1rem"></p>
+      <div class="btn-row" style="justify-content:center">
+        <button class="btn secondary" id="resetTopo">Reset failures</button>
+      </div>
+    </div>
+
+    <div class="panel" id="topoInfo"></div>
+
+    <div class="footer-nav">
+      <a href="tcpip-model.html">← TCP/IP Model</a>
+      <a href="ip-addressing.html">Next: IP Addressing →</a>
+    </div>
+  </main>
+</div>
+<script src="js/nav.js"></script>
+<script src="js/main.js"></script>
+<script>
+const TOPOLOGIES = {
+  star: {
+    label: 'Star',
+    info: 'Every device connects to one central hub or switch. Adding devices is easy and one cable failing only drops that one device — but the hub is a single point of failure for everyone.',
+    nodes: [
+      {id:0, x:240, y:160, label:'hub', hubLike:true},
+      {id:1, x:240, y:60}, {id:2, x:340, y:100}, {id:3, x:380, y:200},
+      {id:4, x:300, y:280}, {id:5, x:180, y:280}, {id:6, x:100, y:200}, {id:7, x:140, y:100},
+    ],
+    edges: [[0,1],[0,2],[0,3],[0,4],[0,5],[0,6],[0,7]],
+  },
+  bus: {
+    label: 'Bus',
+    info: 'All devices tap into one shared backbone cable. Cheap to wire, but a single break splits the bus in two — and everything downstream of the break loses contact with everything upstream.',
+    nodes: [
+      {id:0, x:40, y:160, label:'end'},
+      {id:1, x:105, y:160}, {id:2, x:170, y:160}, {id:3, x:235, y:160},
+      {id:4, x:300, y:160}, {id:5, x:365, y:160}, {id:6, x:430, y:160, label:'end'},
+    ],
+    edges: [[0,1],[1,2],[2,3],[3,4],[4,5],[5,6]],
+  },
+  ring: {
+    label: 'Ring',
+    info: 'Each device connects to exactly two neighbors, forming a loop. Data can travel either direction, so a single failed link or node still leaves a path around the other way — but a second failure can cut the ring in two.',
+    nodes: (() => {
+      const n = 8, out = [];
+      for (let i=0;i<n;i++) {
+        const a = (i / n) * 2 * Math.PI - Math.PI/2;
+        out.push({id:i, x: 240 + 130*Math.cos(a), y: 170 + 130*Math.sin(a)});
+      }
+      return out;
+    })(),
+    edges: (() => { const e=[]; for(let i=0;i<8;i++) e.push([i,(i+1)%8]); return e; })(),
+  },
+  mesh: {
+    label: 'Full Mesh',
+    info: 'Every device connects directly to every other device. Extremely resilient — many nodes have to fail before the network fragments — but the cabling cost explodes as devices are added.',
+    nodes: [
+      {id:0, x:240, y:60}, {id:1, x:380, y:130}, {id:2, x:380, y:230},
+      {id:3, x:240, y:280}, {id:4, x:100, y:230}, {id:5, x:100, y:130},
+    ],
+    edges: (() => { const e=[]; for(let i=0;i<6;i++) for(let j=i+1;j<6;j++) e.push([i,j]); return e; })(),
+  },
+};
+
+let current = 'star';
+let failed = new Set();
+
+const tabsEl = document.getElementById('tabs');
+Object.keys(TOPOLOGIES).forEach(key => {
+  const b = document.createElement('button');
+  b.className = 'topo-tab' + (key === current ? ' active' : '');
+  b.textContent = TOPOLOGIES[key].label;
+  b.dataset.key = key;
+  b.addEventListener('click', () => { current = key; failed = new Set(); render(); updateTabs(); });
+  tabsEl.appendChild(b);
+});
+function updateTabs() {
+  [...tabsEl.children].forEach(b => b.classList.toggle('active', b.dataset.key === current));
+}
+
+function reachableSet(nodes, edges, failedSet) {
+  const alive = nodes.filter(n => !failedSet.has(n.id)).map(n => n.id);
+  if (alive.length === 0) return new Set();
+  const ref = alive[0];
+  const adj = {};
+  nodes.forEach(n => adj[n.id] = []);
+  edges.forEach(([a,b]) => {
+    if (!failedSet.has(a) && !failedSet.has(b)) { adj[a].push(b); adj[b].push(a); }
+  });
+  const seen = new Set([ref]);
+  const q = [ref];
+  while (q.length) {
+    const cur = q.shift();
+    adj[cur].forEach(nb => { if (!seen.has(nb) && !failedSet.has(nb)) { seen.add(nb); q.push(nb); } });
+  }
+  return seen;
+}
+
+const svg = document.getElementById('topoSvg');
+const caption = document.getElementById('topoCaption');
+const infoBox = document.getElementById('topoInfo');
+
+function render() {
+  const t = TOPOLOGIES[current];
+  const reach = reachableSet(t.nodes, t.edges, failed);
+  svg.innerHTML = '';
+  const ns = 'http://www.w3.org/2000/svg';
+
+  t.edges.forEach(([a,b]) => {
+    const na = t.nodes.find(n=>n.id===a), nb = t.nodes.find(n=>n.id===b);
+    const line = document.createElementNS(ns, 'line');
+    line.setAttribute('x1', na.x); line.setAttribute('y1', na.y);
+    line.setAttribute('x2', nb.x); line.setAttribute('y2', nb.y);
+    line.setAttribute('class', 'topo-edge');
+    const dead = failed.has(a) || failed.has(b) || !reach.has(a) || !reach.has(b);
+    line.style.opacity = dead ? '0.25' : '1';
+    if (!dead) line.style.stroke = 'var(--cyan)';
+    svg.appendChild(line);
+  });
+
+  t.nodes.forEach(n => {
+    const g = document.createElementNS(ns, 'g');
+    g.setAttribute('class', 'topo-node');
+    const c = document.createElementNS(ns, 'circle');
+    c.setAttribute('cx', n.x); c.setAttribute('cy', n.y);
+    c.setAttribute('r', n.hubLike ? 16 : 12);
+    let fill = 'var(--text-3)';
+    let stroke = 'var(--border-hi)';
+    if (failed.has(n.id)) { fill = 'var(--red)'; stroke = 'var(--red)'; }
+    else if (reach.has(n.id)) { fill = 'var(--green)'; stroke = 'var(--green)'; }
+    c.setAttribute('fill', fill);
+    c.setAttribute('stroke', stroke);
+    c.setAttribute('stroke-width', '2');
+    c.addEventListener('click', () => {
+      if (failed.has(n.id)) failed.delete(n.id); else failed.add(n.id);
+      render();
+    });
+    g.appendChild(c);
+    const label = document.createElementNS(ns, 'text');
+    label.setAttribute('x', n.x); label.setAttribute('y', n.y + (n.hubLike ? 30 : 26));
+    label.setAttribute('text-anchor', 'middle');
+    label.textContent = n.label || ('PC ' + n.id);
+    g.appendChild(label);
+    svg.appendChild(g);
+  });
+
+  const total = t.nodes.length;
+  const downCount = total - reach.size;
+  if (failed.size === 0) {
+    caption.textContent = `All ${total} devices reachable. Click a node to simulate a failure.`;
+  } else if (downCount === failed.size) {
+    caption.textContent = `${failed.size} device(s) failed. The rest of the network is unaffected — still ${reach.size} reachable.`;
+  } else {
+    caption.textContent = `${failed.size} device(s) failed, and it split the network: only ${reach.size} of ${total} devices can still reach each other.`;
+  }
+  infoBox.innerHTML = `<h3>${t.label} topology</h3><p style="margin:0">${t.info}</p>`;
+}
+
+document.getElementById('resetTopo').addEventListener('click', () => { failed = new Set(); render(); });
+render();
+</script>
+</body>
+</html>

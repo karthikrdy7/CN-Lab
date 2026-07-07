@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DNS &amp; HTTP — NETSTACK</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .actor { text-align: center; }
+  .actor-box {
+    width: 54px; height: 54px; border-radius: 10px;
+    background: var(--bg-panel); border: 1.5px solid var(--border-hi);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 0.4rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    font-size: 1.3rem;
+  }
+  .actor-box.active { border-color: var(--cyan); box-shadow: 0 0 14px 1px rgba(76,201,240,0.4); }
+  .actor-label { font-family: var(--mono); font-size: 0.68rem; color: var(--text-3); }
+  .step-line { font-family: var(--mono); font-size: 0.85rem; color: var(--text-2); padding: 0.4rem 0; border-bottom: 1px dashed var(--border); opacity: 0.3; transition: opacity 0.2s, color 0.2s; }
+  .step-line.done { opacity: 1; color: var(--text-1); }
+  .toggle-row { display: flex; align-items: center; gap: 0.6rem; font-family: var(--mono); font-size: 0.8rem; color: var(--text-2); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar-slot"></aside>
+  <main>
+    <div class="page-eyebrow">// module 08</div>
+    <h1>DNS &amp; HTTP</h1>
+    <p class="lede">Type a URL and hit enter — before a single pixel of the page loads, your browser has to translate a human-readable name into an IP address (DNS), then have an entire conversation with that server (HTTP). Run it below.</p>
+
+    <div class="panel">
+      <div class="btn-row" style="justify-content: space-between; align-items:center">
+        <div class="toggle-row">
+          <input type="checkbox" id="cachedToggle"> <label for="cachedToggle">example.com is already cached from a previous visit</label>
+        </div>
+        <div>
+          <button class="btn" id="playDns">▶ Visit example.com</button>
+          <button class="btn secondary" id="resetDns">Reset</button>
+        </div>
+      </div>
+
+      <svg id="dnsSvg" viewBox="0 0 900 140" width="100%" style="margin-top:1rem"></svg>
+      <div id="actorRow" style="display:flex; justify-content: space-between; margin-top:-2.2rem; padding: 0 1%;"></div>
+
+      <div id="stepList" style="margin-top:2.5rem"></div>
+    </div>
+
+    <h2>The cast of characters</h2>
+    <table>
+      <thead><tr><th>Actor</th><th>Role</th></tr></thead>
+      <tbody>
+        <tr><td>Resolver</td><td>Usually run by your ISP or a public service (like 1.1.1.1) — does the lookup legwork for you and caches answers</td></tr>
+        <tr><td>Root server</td><td>Knows which servers handle each top-level domain (.com, .org, etc.)</td></tr>
+        <tr><td>TLD server</td><td>Knows which nameserver is authoritative for a specific domain</td></tr>
+        <tr><td>Authoritative nameserver</td><td>Holds the actual, final answer: the IP address for that domain</td></tr>
+      </tbody>
+    </table>
+    <div class="callout">Caching is why the second visit to a site is faster than the first — your resolver already has the IP address memorized and skips straight to the HTTP request.</div>
+
+    <div class="footer-nav">
+      <a href="tcp-udp.html">← TCP vs UDP</a>
+      <a href="index.html">Back to home →</a>
+    </div>
+  </main>
+</div>
+<script src="js/nav.js"></script>
+<script src="js/main.js"></script>
+<script>
+const ACTORS = [
+  { id: 'browser', x: 40,  icon: '🖥️', label: 'Browser' },
+  { id: 'resolver', x: 220, icon: '📇', label: 'Resolver' },
+  { id: 'root', x: 400, icon: '🌐', label: 'Root' },
+  { id: 'tld', x: 560, icon: '📁', label: '.com TLD' },
+  { id: 'auth', x: 720, icon: '🗄️', label: 'Authoritative' },
+  { id: 'server', x: 860, icon: '🖧', label: 'Web Server' },
+];
+const Y = 40;
+
+const svg = document.getElementById('dnsSvg');
+const ns = 'http://www.w3.org/2000/svg';
+const actorRow = document.getElementById('actorRow');
+
+ACTORS.forEach(a => {
+  const d = document.createElement('div');
+  d.className = 'actor';
+  d.style.width = '80px';
+  d.innerHTML = `<div class="actor-box" id="box-${a.id}">${a.icon}</div><div class="actor-label">${a.label}</div>`;
+  actorRow.appendChild(d);
+});
+
+function pos(id) { return ACTORS.find(a => a.id === id); }
+
+const FULL_STEPS = [
+  { src:'browser', dst:'resolver', label:'Browser asks the resolver: "What\'s the IP for example.com?"', cacheSkip:false },
+  { src:'resolver', dst:'root', label:'Resolver (cache miss) asks a root server where .com is handled.', cacheSkip:true },
+  { src:'root', dst:'resolver', label:'Root server points to the .com TLD servers.', cacheSkip:true },
+  { src:'resolver', dst:'tld', label:'Resolver asks the .com TLD server about example.com specifically.', cacheSkip:true },
+  { src:'tld', dst:'resolver', label:'TLD server points to example.com\'s authoritative nameserver.', cacheSkip:true },
+  { src:'resolver', dst:'auth', label:'Resolver asks the authoritative nameserver for the actual IP.', cacheSkip:true },
+  { src:'auth', dst:'resolver', label:'Authoritative nameserver replies: 93.184.216.34.', cacheSkip:true },
+  { src:'resolver', dst:'browser', label:'Resolver hands the IP back to the browser (and caches it).', cacheSkip:false },
+  { src:'browser', dst:'server', label:'Browser opens a TCP connection to 93.184.216.34 and sends: GET / HTTP/1.1', cacheSkip:false },
+  { src:'server', dst:'browser', label:'Server replies: HTTP/1.1 200 OK, followed by the page\'s HTML.', cacheSkip:false },
+];
+
+function buildStepList(cached) {
+  const list = document.getElementById('stepList');
+  list.innerHTML = '';
+  const steps = FULL_STEPS.filter(s => !(cached && s.cacheSkip));
+  steps.forEach((s, i) => {
+    const d = document.createElement('div');
+    d.className = 'step-line';
+    d.id = 'step-' + i;
+    d.textContent = s.label;
+    list.appendChild(d);
+  });
+  return steps;
+}
+let activeSteps = buildStepList(false);
+
+function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+function clearActive() {
+  ACTORS.forEach(a => document.getElementById('box-'+a.id).classList.remove('active'));
+}
+
+async function playDns() {
+  const cached = document.getElementById('cachedToggle').checked;
+  resetVisual();
+  activeSteps = buildStepList(cached);
+  document.getElementById('playDns').disabled = true;
+
+  for (let i=0;i<activeSteps.length;i++) {
+    const s = activeSteps[i];
+    clearActive();
+    document.getElementById('box-'+s.src).classList.add('active');
+    document.getElementById('box-'+s.dst).classList.add('active');
+
+    const a = pos(s.src), b = pos(s.dst);
+    const dist = Math.abs(b.x - a.x);
+    const curve = Math.min(30, dist * 0.12);
+    const path = document.createElementNS(ns, 'path');
+    const midx = (a.x + b.x) / 2;
+    path.setAttribute('d', `M ${a.x} ${Y} Q ${midx} ${Y - 20 - curve} ${b.x} ${Y}`);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', 'var(--border-hi)');
+    path.setAttribute('stroke-width', '1.5');
+    path.setAttribute('stroke-dasharray', '3 4');
+    svg.appendChild(path);
+
+    const dot = document.createElementNS(ns, 'circle');
+    dot.setAttribute('r', 6);
+    dot.setAttribute('fill', 'var(--cyan)');
+    dot.style.filter = 'drop-shadow(0 0 6px var(--cyan))';
+    svg.appendChild(dot);
+
+    document.getElementById('step-'+i).classList.add('done');
+
+    await new Promise(resolve => animateAlongPath(dot, path, { duration: 800, onDone: resolve }));
+    dot.remove();
+    await wait(150);
+  }
+  clearActive();
+  document.getElementById('playDns').disabled = false;
+}
+
+function resetVisual() {
+  svg.innerHTML = '';
+  clearActive();
+  document.querySelectorAll('.step-line').forEach(el => el.classList.remove('done'));
+}
+
+document.getElementById('playDns').addEventListener('click', playDns);
+document.getElementById('resetDns').addEventListener('click', () => { resetVisual(); buildStepList(document.getElementById('cachedToggle').checked); });
+document.getElementById('cachedToggle').addEventListener('change', (e) => { resetVisual(); buildStepList(e.target.checked); });
+</script>
+</body>
+</html>

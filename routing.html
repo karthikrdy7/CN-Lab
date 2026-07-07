@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Routing — NETSTACK</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .route-wrap { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 2rem; align-items: start; }
+  @media (max-width: 800px) { .route-wrap { grid-template-columns: 1fr; } }
+  .edge-label { font-family: var(--mono); font-size: 10px; fill: var(--text-3); }
+  .select-row { display: flex; gap: 0.8rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
+  .hop-caption { min-height: 3em; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar-slot"></aside>
+  <main>
+    <div class="page-eyebrow">// module 06</div>
+    <h1>Routing (Layer 3)</h1>
+    <p class="lede">Switching gets a frame across one local network. <b style="color:var(--text-1)">Routing</b> is what happens between different networks — routers pass a packet from one to the next, each one making an independent decision about the best next hop, until it reaches its destination. Pick a source and destination router below.</p>
+
+    <div class="panel">
+      <div class="select-row">
+        <label class="mono" style="color:var(--text-3); font-size:0.8rem">Source</label>
+        <select id="fromSel" class="mono"></select>
+        <label class="mono" style="color:var(--text-3); font-size:0.8rem">Destination</label>
+        <select id="toSel" class="mono"></select>
+        <button class="btn" id="findBtn">Find shortest path</button>
+      </div>
+      <div class="route-wrap">
+        <svg id="routeSvg" viewBox="0 0 460 320" width="100%"></svg>
+        <div>
+          <div class="mac-table-title" style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-3);margin-bottom:0.5rem">Path found</div>
+          <table id="pathTable">
+            <thead><tr><th>Hop</th><th>Router</th><th>Cost so far</th></tr></thead>
+            <tbody id="pathTableBody"><tr><td colspan="3" style="color:var(--text-3)">— run a search —</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <p class="lede hop-caption" id="hopCaption"></p>
+    </div>
+
+    <h2>Why the numbers on the links matter</h2>
+    <p>Each link between routers has a <b style="color:var(--text-1)">cost</b> — often based on bandwidth or latency. Routers don't just pick the path with the fewest hops; they pick the path with the lowest total cost, even if that means passing through more routers. This simulation uses Dijkstra's algorithm, one of the real algorithms link-state routing protocols like OSPF are built on.</p>
+
+    <div class="callout">If a link goes down, routers detect it and recalculate — this is why the internet can keep working even when a cable gets cut somewhere in the middle. Traffic just finds a different path.</div>
+
+    <div class="footer-nav">
+      <a href="switching.html">← Switching</a>
+      <a href="tcp-udp.html">Next: TCP vs UDP →</a>
+    </div>
+  </main>
+</div>
+<script src="js/nav.js"></script>
+<script src="js/main.js"></script>
+<script>
+const NODES = [
+  { id: 'A', x: 50,  y: 160, label: 'R1 (you)' },
+  { id: 'B', x: 160, y: 60 },
+  { id: 'C', x: 160, y: 260 },
+  { id: 'D', x: 280, y: 100 },
+  { id: 'E', x: 280, y: 220 },
+  { id: 'F', x: 400, y: 160, label: 'R6 (dest)' },
+];
+const EDGES = [
+  ['A','B',4], ['A','C',2],
+  ['B','D',5], ['C','D',1], ['C','E',7],
+  ['D','F',3], ['E','F',2], ['D','E',2],
+];
+
+const fromSel = document.getElementById('fromSel');
+const toSel = document.getElementById('toSel');
+NODES.forEach(n => {
+  const label = n.label ? n.label : 'R' + n.id;
+  const o1 = document.createElement('option'); o1.value = n.id; o1.textContent = label;
+  fromSel.appendChild(o1);
+  const o2 = document.createElement('option'); o2.value = n.id; o2.textContent = label;
+  toSel.appendChild(o2);
+});
+fromSel.value = 'A'; toSel.value = 'F';
+
+function dijkstra(start, end) {
+  const dist = {}, prev = {}, visited = new Set();
+  NODES.forEach(n => dist[n.id] = Infinity);
+  dist[start] = 0;
+  const adj = {};
+  NODES.forEach(n => adj[n.id] = []);
+  EDGES.forEach(([a,b,w]) => { adj[a].push([b,w]); adj[b].push([a,w]); });
+
+  while (visited.size < NODES.length) {
+    let u = null, best = Infinity;
+    for (const n of NODES) if (!visited.has(n.id) && dist[n.id] < best) { best = dist[n.id]; u = n.id; }
+    if (u === null) break;
+    visited.add(u);
+    adj[u].forEach(([v,w]) => {
+      if (dist[u] + w < dist[v]) { dist[v] = dist[u] + w; prev[v] = u; }
+    });
+  }
+  if (dist[end] === Infinity) return null;
+  const path = [end];
+  let cur = end;
+  while (cur !== start) { cur = prev[cur]; path.unshift(cur); }
+  return { path, total: dist[end], dist };
+}
+
+const svg = document.getElementById('routeSvg');
+const ns = 'http://www.w3.org/2000/svg';
+
+function drawBase(highlightEdges = new Set()) {
+  svg.innerHTML = '';
+  EDGES.forEach(([a,b,w]) => {
+    const na = NODES.find(n=>n.id===a), nb = NODES.find(n=>n.id===b);
+    const key1 = a+'-'+b, key2 = b+'-'+a;
+    const isHi = highlightEdges.has(key1) || highlightEdges.has(key2);
+    const line = document.createElementNS(ns,'line');
+    line.setAttribute('x1', na.x); line.setAttribute('y1', na.y);
+    line.setAttribute('x2', nb.x); line.setAttribute('y2', nb.y);
+    line.setAttribute('stroke', isHi ? 'var(--cyan)' : 'var(--border-hi)');
+    line.setAttribute('stroke-width', isHi ? '3' : '2');
+    svg.appendChild(line);
+    const label = document.createElementNS(ns,'text');
+    label.setAttribute('x', (na.x+nb.x)/2); label.setAttribute('y', (na.y+nb.y)/2 - 6);
+    label.setAttribute('class', 'edge-label');
+    label.setAttribute('text-anchor','middle');
+    label.textContent = w;
+    svg.appendChild(label);
+  });
+  NODES.forEach(n => {
+    const g = document.createElementNS(ns,'g');
+    const c = document.createElementNS(ns,'circle');
+    c.setAttribute('cx', n.x); c.setAttribute('cy', n.y); c.setAttribute('r', 16);
+    c.setAttribute('fill', 'var(--bg-panel)');
+    c.setAttribute('stroke', 'var(--border-hi)');
+    c.setAttribute('stroke-width', '2');
+    c.setAttribute('id', 'rnode-' + n.id);
+    g.appendChild(c);
+    const t = document.createElementNS(ns,'text');
+    t.setAttribute('x', n.x); t.setAttribute('y', n.y+4);
+    t.setAttribute('text-anchor','middle');
+    t.setAttribute('fill', 'var(--text-1)');
+    t.setAttribute('font-family','var(--mono)'); t.setAttribute('font-size','11');
+    t.textContent = n.id;
+    g.appendChild(t);
+    const lbl = document.createElementNS(ns,'text');
+    lbl.setAttribute('x', n.x); lbl.setAttribute('y', n.y + 30);
+    lbl.setAttribute('text-anchor','middle');
+    lbl.setAttribute('fill', 'var(--text-3)');
+    lbl.setAttribute('font-family','var(--mono)'); lbl.setAttribute('font-size','9');
+    lbl.textContent = n.label || '';
+    g.appendChild(lbl);
+    svg.appendChild(g);
+  });
+  const packet = document.createElementNS(ns,'circle');
+  packet.setAttribute('r', 7); packet.setAttribute('fill', 'var(--cyan)');
+  packet.setAttribute('id', 'routePacket');
+  packet.style.filter = 'drop-shadow(0 0 7px var(--cyan))';
+  packet.style.opacity = 0;
+  svg.appendChild(packet);
+}
+drawBase();
+
+function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+async function findPath() {
+  const from = fromSel.value, to = toSel.value;
+  const caption = document.getElementById('hopCaption');
+  const tbody = document.getElementById('pathTableBody');
+  if (from === to) { caption.textContent = 'Pick two different routers.'; return; }
+
+  const result = dijkstra(from, to);
+  if (!result) { caption.textContent = 'No path exists between these routers.'; return; }
+
+  const hiEdges = new Set();
+  for (let i=0;i<result.path.length-1;i++) hiEdges.add(result.path[i]+'-'+result.path[i+1]);
+  drawBase(hiEdges);
+
+  tbody.innerHTML = '';
+  caption.textContent = `Lowest-cost path: ${result.path.join(' → ')} (total cost ${result.total})`;
+
+  const packet = document.getElementById('routePacket');
+  let cumulative = 0;
+  for (let i=0;i<result.path.length;i++) {
+    const node = NODES.find(n=>n.id===result.path[i]);
+    if (i > 0) {
+      const prevNode = NODES.find(n=>n.id===result.path[i-1]);
+      const edge = EDGES.find(([a,b]) => (a===prevNode.id&&b===node.id)||(a===node.id&&b===prevNode.id));
+      cumulative += edge[2];
+      packet.style.opacity = 1;
+      await new Promise(resolve => {
+        const start = performance.now();
+        function step(now) {
+          const t = Math.min(1, (now-start)/650);
+          packet.setAttribute('cx', prevNode.x + (node.x-prevNode.x)*t);
+          packet.setAttribute('cy', prevNode.y + (node.y-prevNode.y)*t);
+          if (t<1) requestAnimationFrame(step); else resolve();
+        }
+        requestAnimationFrame(step);
+      });
+    }
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${i}</td><td>${node.label || 'R'+node.id}</td><td>${cumulative}</td>`;
+    tbody.appendChild(tr);
+    await wait(200);
+  }
+  packet.style.opacity = 0;
+}
+
+document.getElementById('findBtn').addEventListener('click', findPath);
+</script>
+</body>
+</html>

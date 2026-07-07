@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The OSI Model — NETSTACK</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .stack { display: flex; flex-direction: column; gap: 6px; margin: 1.6rem 0; }
+  .layer {
+    display: grid;
+    grid-template-columns: 2.2rem 1fr auto;
+    align-items: center;
+    gap: 1rem;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--layer-color, var(--cyan));
+    border-radius: var(--radius-sm);
+    padding: 0.8rem 1rem;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .layer:hover { background: var(--bg-panel-2); }
+  .layer .lnum { font-family: var(--mono); color: var(--layer-color, var(--cyan)); font-weight: 700; }
+  .layer .lname { font-weight: 600; color: var(--text-1); }
+  .layer .lsub { font-size: 0.8rem; color: var(--text-3); display: block; }
+  .layer .pdu { font-family: var(--mono); font-size: 0.75rem; color: var(--text-3); }
+  .layer-detail {
+    display: none;
+    background: var(--bg);
+    border: 1px dashed var(--border-hi);
+    border-radius: var(--radius-sm);
+    padding: 0.9rem 1.1rem;
+    margin: -2px 0 4px;
+    font-size: 0.88rem;
+  }
+  .layer-detail.open { display: block; }
+  .layer-detail .analogy { color: var(--text-2); font-style: italic; margin-top: 0.4rem; }
+
+  /* encapsulation demo */
+  .demo-stacks { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 1rem; }
+  @media (max-width: 760px) { .demo-stacks { grid-template-columns: 1fr; } }
+  .demo-col h4 { text-align: center; color: var(--text-3); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; }
+  .mini-stack { display: flex; flex-direction: column-reverse; gap: 4px; }
+  .mini-layer {
+    height: 34px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 0.72rem; color: var(--text-3);
+    background: var(--bg-panel);
+    position: relative;
+  }
+  .mini-layer.active { border-color: var(--cyan); color: var(--cyan); background: var(--cyan-dim); }
+  .payload-box {
+    margin: 0 auto;
+    max-width: 200px;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    padding: 0.5rem;
+  }
+  .payload-tags { display: flex; flex-direction: column-reverse; gap: 2px; border-radius: 4px; overflow: hidden; }
+  .payload-tags .tagband {
+    padding: 3px 6px;
+    font-size: 0.65rem;
+    color: var(--bg);
+    font-weight: 600;
+  }
+  .wire {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+    color: var(--text-3); font-family: var(--mono); font-size: 0.75rem;
+    padding: 0.6rem 0;
+  }
+  .wire-line { flex: 1; height: 1px; background: var(--border-hi); position: relative; }
+  .wire-packet {
+    position: absolute; top: -5px; left: 0;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--cyan); box-shadow: 0 0 8px 2px var(--cyan);
+    opacity: 0;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar-slot"></aside>
+  <main>
+    <div class="page-eyebrow">// module 01</div>
+    <h1>The OSI Model</h1>
+    <p class="lede">The OSI (Open Systems Interconnection) model splits everything a network does into 7 stacked layers. No single device implements all seven perfectly — but the model is the shared vocabulary engineers use to talk about "where" a problem lives. Click a layer to learn what it's responsible for.</p>
+
+    <div class="stack" id="stack"></div>
+
+    <h2>Watch a message cross the stack</h2>
+    <p class="lede">When your computer sends something, it doesn't just fire off your data — each layer wraps it in its own header first. This is <b style="color:var(--text-1)">encapsulation</b>. The receiving computer then unwraps those headers one by one, from the bottom up, called <b style="color:var(--text-1)">decapsulation</b>.</p>
+
+    <div class="panel">
+      <div class="btn-row">
+        <button class="btn" id="playBtn">▶ Send "Hi Sam"</button>
+        <button class="btn secondary" id="resetBtn">Reset</button>
+      </div>
+      <div class="demo-stacks">
+        <div class="demo-col">
+          <h4>Sender</h4>
+          <div class="payload-box" id="senderPayload">
+            <div class="payload-tags" id="senderTags"></div>
+          </div>
+        </div>
+        <div class="demo-col">
+          <h4>Receiver</h4>
+          <div class="payload-box" id="receiverPayload">
+            <div class="payload-tags" id="receiverTags"></div>
+          </div>
+        </div>
+        <div class="wire">
+          <span>physical link</span>
+          <div class="wire-line"><div class="wire-packet" id="wirePacket"></div></div>
+          <span id="wireStatus">idle</span>
+        </div>
+      </div>
+      <p id="stepCaption" class="lede" style="margin-top:1rem; min-height: 1.4em;"></p>
+    </div>
+
+    <div class="callout">Real devices don't always touch all 7 layers — a switch mostly only cares about layer 2, a router mostly cares about layer 3. That's exactly why the model is useful: it tells you which layer to suspect when something breaks.</div>
+
+    <div class="footer-nav">
+      <a href="index.html">← Home</a>
+      <a href="tcpip-model.html">Next: TCP/IP Model →</a>
+    </div>
+  </main>
+</div>
+<script src="js/nav.js"></script>
+<script src="js/main.js"></script>
+<script>
+const LAYERS = [
+  { n:7, name:'Application', color:'var(--cyan)', pdu:'Data', sub:'HTTP, DNS, SMTP — the protocols your apps speak',
+    detail:'This is the only layer most software actually talks to directly. A browser asking for a webpage (HTTP) or your email app checking for new mail (SMTP/IMAP) is operating here.',
+    analogy:'The words you actually want to say.' },
+  { n:6, name:'Presentation', color:'var(--cyan)', pdu:'Data', sub:'Formatting, encryption, compression',
+    detail:'Makes sure data from the application layer is in a format both ends understand — encrypting it with TLS, compressing it, or converting between text encodings.',
+    analogy:'Translating your letter into a language the recipient reads, and sealing the envelope.' },
+  { n:5, name:'Session', color:'var(--cyan)', pdu:'Data', sub:'Opening, managing, and closing conversations',
+    detail:'Keeps track of an ongoing exchange between two devices — so a long file transfer or video call knows it\'s still "the same conversation" across many packets.',
+    analogy:'Keeping a phone call connected while you both keep talking.' },
+  { n:4, name:'Transport', color:'var(--green)', pdu:'Segment / Datagram', sub:'TCP or UDP — ports, ordering, reliability',
+    detail:'Splits data into manageable chunks, adds a source and destination port number, and (if using TCP) guarantees chunks arrive in order and undamaged.',
+    analogy:'Numbering the pages of a long letter so they can be put back in order.' },
+  { n:3, name:'Network', color:'var(--amber)', pdu:'Packet', sub:'IP addressing and routing between networks',
+    detail:'Adds the source and destination IP address and figures out, hop by hop, which direction to send the packet to eventually reach a different network.',
+    analogy:'Writing the full street address on the envelope.' },
+  { n:2, name:'Data Link', color:'var(--violet)', pdu:'Frame', sub:'MAC addressing — delivery within one local network',
+    detail:'Wraps the packet in a frame addressed to a MAC address — a hardware ID for the very next device on the wire, like a switch or the next router.',
+    analogy:'The local post office sorting mail by street before a courier delivers it.' },
+  { n:1, name:'Physical', color:'var(--red)', pdu:'Bits', sub:'Cables, radio waves, voltages — actual signal transmission',
+    detail:'The literal electrical signals, light pulses, or radio waves that carry your 1s and 0s across a wire, fiber, or through the air.',
+    analogy:'The delivery truck and roads the letter physically travels on.' },
+];
+
+const stackEl = document.getElementById('stack');
+LAYERS.forEach(l => {
+  const row = document.createElement('div');
+  row.innerHTML = `
+    <div class="layer" style="--layer-color:${l.color}" data-n="${l.n}">
+      <span class="lnum">L${l.n}</span>
+      <span><span class="lname">${l.name}</span><span class="lsub">${l.sub}</span></span>
+      <span class="pdu">${l.pdu}</span>
+    </div>
+    <div class="layer-detail" id="detail-${l.n}">
+      <p style="margin:0">${l.detail}</p>
+      <p class="analogy">Analogy: ${l.analogy}</p>
+    </div>`;
+  stackEl.appendChild(row);
+});
+stackEl.addEventListener('click', (e) => {
+  const layer = e.target.closest('.layer');
+  if (!layer) return;
+  document.getElementById(`detail-${layer.dataset.n}`).classList.toggle('open');
+});
+
+// Encapsulation demo
+const senderMini = [7,6,5,4,3,2,1];
+function buildMiniStack(container) {
+  container.innerHTML = '';
+  senderMini.forEach(n => {
+    const l = LAYERS.find(x => x.n === n);
+    const d = document.createElement('div');
+    d.className = 'mini-layer';
+    d.id = container.id + '-' + n;
+    d.style.setProperty('--layer-color', l.color);
+    d.textContent = `L${n} ${l.name}`;
+    container.appendChild(d);
+  });
+}
+const senderStackEl = document.createElement('div');
+senderStackEl.className = 'mini-stack';
+senderStackEl.id = 'senderStack';
+document.getElementById('senderPayload').before(senderStackEl);
+buildMiniStack(senderStackEl);
+
+const receiverStackEl = document.createElement('div');
+receiverStackEl.className = 'mini-stack';
+receiverStackEl.id = 'receiverStack';
+document.getElementById('receiverPayload').before(receiverStackEl);
+buildMiniStack(receiverStackEl);
+
+const tagOrder = [
+  { n:4, label:'TCP: port 443', short:'SEG' },
+  { n:3, label:'IP: 93.184.x.x', short:'PKT' },
+  { n:2, label:'MAC: aa:bb:..', short:'FRM' },
+];
+
+const senderTags = document.getElementById('senderTags');
+const receiverTags = document.getElementById('receiverTags');
+const caption = document.getElementById('stepCaption');
+const wirePacket = document.getElementById('wirePacket');
+const wireStatus = document.getElementById('wireStatus');
+let playing = false;
+
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function setActive(id, n, on) {
+  const el = document.getElementById(id + '-' + n);
+  if (el) el.classList.toggle('active', on);
+}
+
+async function playDemo() {
+  if (playing) return;
+  playing = true;
+  document.getElementById('playBtn').disabled = true;
+  reset(false);
+
+  senderTags.innerHTML = `<div class="tagband" style="background:var(--cyan)">"Hi Sam" (app data)</div>`;
+  setActive('senderStack', 7, true);
+  caption.textContent = 'Layer 7 (Application): the raw message is handed down the stack.';
+  await wait(1000);
+
+  for (const t of tagOrder) {
+    const l = LAYERS.find(x => x.n === t.n);
+    setActive('senderStack', t.n, true);
+    const band = document.createElement('div');
+    band.className = 'tagband';
+    band.style.background = l.color;
+    band.textContent = `${t.short}: ${t.label}`;
+    senderTags.prepend(band);
+    caption.textContent = `Layer ${t.n} (${l.name}) adds its own header: ${t.label}.`;
+    await wait(1000);
+  }
+
+  caption.textContent = 'Layer 1 (Physical): the fully-wrapped frame is converted to signals and sent over the wire.';
+  setActive('senderStack', 1, true);
+  wireStatus.textContent = 'transmitting…';
+  wirePacket.style.opacity = 1;
+  await new Promise(resolve => {
+    const path = { getTotalLength: () => 1, getPointAtLength: () => ({x:0,y:0}) };
+    // simple left->right tween instead of svg path (this is a div, not svg)
+    const line = wirePacket.parentElement;
+    const width = line.clientWidth;
+    const start = performance.now();
+    function step(now) {
+      const t = Math.min(1, (now - start) / 900);
+      wirePacket.style.left = (t * (width - 10)) + 'px';
+      if (t < 1) requestAnimationFrame(step); else resolve();
+    }
+    requestAnimationFrame(step);
+  });
+  wireStatus.textContent = 'received';
+  wirePacket.style.opacity = 0;
+
+  // build up receiver tags fully wrapped, then peel off
+  receiverTags.innerHTML = `<div class="tagband" style="background:var(--cyan)">"Hi Sam" (app data)</div>`;
+  tagOrder.forEach(t => {
+    const l = LAYERS.find(x => x.n === t.n);
+    const band = document.createElement('div');
+    band.className = 'tagband';
+    band.style.background = l.color;
+    band.textContent = `${t.short}: ${t.label}`;
+    receiverTags.prepend(band);
+  });
+  setActive('receiverStack', 1, true);
+  caption.textContent = 'Layer 1 on the receiver reads the raw signal back into bits.';
+  await wait(1000);
+
+  for (const t of [...tagOrder].reverse()) {
+    const l = LAYERS.find(x => x.n === t.n);
+    setActive('receiverStack', t.n, true);
+    const band = receiverTags.querySelector('.tagband');
+    if (band && band.textContent.startsWith(t.short)) band.remove();
+    caption.textContent = `Layer ${t.n} (${l.name}) reads and strips its header.`;
+    await wait(1000);
+  }
+  setActive('receiverStack', 7, true);
+  caption.textContent = 'Layer 7 on the receiver: the app finally sees "Hi Sam" — exactly what was sent.';
+  playing = false;
+  document.getElementById('playBtn').disabled = false;
+}
+
+function reset(clearCaption = true) {
+  [...senderMini, ...senderMini].forEach(n => {
+    setActive('senderStack', n, false);
+    setActive('receiverStack', n, false);
+  });
+  senderTags.innerHTML = '';
+  receiverTags.innerHTML = '';
+  wirePacket.style.left = '0px';
+  wirePacket.style.opacity = 0;
+  wireStatus.textContent = 'idle';
+  if (clearCaption) caption.textContent = '';
+}
+
+document.getElementById('playBtn').addEventListener('click', playDemo);
+document.getElementById('resetBtn').addEventListener('click', () => reset());
+</script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TCP/IP Model — NETSTACK</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin: 1.8rem 0; }
+  @media (max-width: 760px) { .compare { grid-template-columns: 1fr; } }
+  .compare h4 { text-align:center; color: var(--text-3); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; }
+  .col-stack { display: flex; flex-direction: column; gap: 6px; }
+  .osi-row, .tcpip-row {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.55rem 0.8rem;
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    background: var(--bg-panel);
+    transition: box-shadow 0.15s, border-color 0.15s;
+  }
+  .tcpip-row { display: flex; flex-direction: column; gap: 4px; padding: 0.6rem 0.8rem; }
+  .tcpip-row .osi-mini { font-size: 0.68rem; color: var(--text-3); border: 1px dashed var(--border-hi); border-radius: 4px; padding: 0.2rem 0.5rem; }
+  .glow { border-color: var(--cyan) !important; box-shadow: 0 0 0 1px var(--cyan) inset; }
+  .glow-dim { opacity: 0.35; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar-slot"></aside>
+  <main>
+    <div class="page-eyebrow">// module 02</div>
+    <h1>TCP/IP Model</h1>
+    <p class="lede">OSI is the teaching model. TCP/IP — sometimes called the Internet Protocol Suite — is the model the actual internet runs on, and it only has <b style="color:var(--text-1)">4 layers</b>. It groups several OSI layers together because, in practice, real protocols don't respect OSI's clean boundaries. Hover a row to see how the two line up.</p>
+
+    <div class="compare">
+      <div>
+        <h4>OSI (7 layers)</h4>
+        <div class="col-stack" id="osiCol"></div>
+      </div>
+      <div>
+        <h4>TCP/IP (4 layers)</h4>
+        <div class="col-stack" id="tcpipCol"></div>
+      </div>
+    </div>
+
+    <h2>Why it has fewer layers</h2>
+    <p>OSI separated Application, Presentation, and Session because, in theory, those are three distinct jobs. In practice, a single protocol like HTTP handles formatting and session behavior itself — there's no separate "presentation protocol" running underneath it. TCP/IP just admits that and merges all three into one <b style="color:var(--text-1)">Application</b> layer.</p>
+
+    <div class="callout">When people say "which layer does a firewall work at?" or "that's a layer 3 problem," they're almost always using OSI's numbers — even on a network that's technically running the TCP/IP model. OSI survives as the shared vocabulary.</div>
+
+    <div class="footer-nav">
+      <a href="osi-model.html">← The OSI Model</a>
+      <a href="topologies.html">Next: Network Topologies →</a>
+    </div>
+  </main>
+</div>
+<script src="js/nav.js"></script>
+<script src="js/main.js"></script>
+<script>
+const OSI = [
+  {n:7, name:'Application', group:0},
+  {n:6, name:'Presentation', group:0},
+  {n:5, name:'Session', group:0},
+  {n:4, name:'Transport', group:1},
+  {n:3, name:'Network', group:2},
+  {n:2, name:'Data Link', group:3},
+  {n:1, name:'Physical', group:3},
+];
+const TCPIP = [
+  {name:'Application', desc:'HTTP, DNS, TLS, SMTP…', group:0, osi:'OSI layers 7–5'},
+  {name:'Transport', desc:'TCP, UDP', group:1, osi:'OSI layer 4'},
+  {name:'Internet', desc:'IP, ICMP', group:2, osi:'OSI layer 3'},
+  {name:'Network Access', desc:'Ethernet, Wi-Fi, ARP', group:3, osi:'OSI layers 2–1'},
+];
+
+const osiCol = document.getElementById('osiCol');
+OSI.forEach(l => {
+  const d = document.createElement('div');
+  d.className = 'osi-row';
+  d.dataset.group = l.group;
+  d.textContent = `L${l.n} ${l.name}`;
+  osiCol.appendChild(d);
+});
+
+const tcpipCol = document.getElementById('tcpipCol');
+TCPIP.forEach(l => {
+  const d = document.createElement('div');
+  d.className = 'tcpip-row';
+  d.dataset.group = l.group;
+  d.innerHTML = `<span style="color:var(--text-1)">${l.name}</span><span style="color:var(--text-3); font-size:0.72rem">${l.desc}</span><span class="osi-mini">${l.osi}</span>`;
+  tcpipCol.appendChild(d);
+});
+
+function highlight(group) {
+  document.querySelectorAll('.osi-row, .tcpip-row').forEach(el => {
+    if (group === null) { el.classList.remove('glow','glow-dim'); return; }
+    if (el.dataset.group === String(group)) { el.classList.add('glow'); el.classList.remove('glow-dim'); }
+    else { el.classList.add('glow-dim'); el.classList.remove('glow'); }
+  });
+}
+document.querySelectorAll('.osi-row, .tcpip-row').forEach(el => {
+  el.addEventListener('mouseenter', () => highlight(el.dataset.group));
+  el.addEventListener('mouseleave', () => highlight(null));
+});
+</script>
+</body>
+</html>

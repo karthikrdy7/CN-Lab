@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TCP vs UDP — NETSTACK</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .seq-header { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 0.85rem; color: var(--text-1); padding: 0 0 0.5rem; border-bottom: 1px solid var(--border); margin-bottom: 0.8rem; }
+  .seq-lane { position: relative; min-height: 260px; }
+  .seq-rail { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--border); }
+  .seq-rail.left { left: 8%; }
+  .seq-rail.right { right: 8%; }
+  .seq-row { position: relative; height: 40px; }
+  .seq-track { position: absolute; left: 8%; right: 8%; top: 50%; height: 1px; }
+  .seq-dot { position: absolute; top: -5px; width: 11px; height: 11px; border-radius: 50%; background: var(--cyan); box-shadow: 0 0 8px 2px var(--cyan); opacity: 0; }
+  .seq-dot.lost { background: var(--red); box-shadow: 0 0 8px 2px var(--red); }
+  .seq-label { position: absolute; top: -22px; left: 50%; transform: translateX(-50%); font-family: var(--mono); font-size: 0.72rem; color: var(--text-2); white-space: nowrap; }
+  .seq-label.lost-label { color: var(--red); }
+  .tabs2 { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+  .caption-box { min-height: 2.4em; margin-top: 1rem; }
+  .compare-table td:first-child { color: var(--text-1); }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar-slot"></aside>
+  <main>
+    <div class="page-eyebrow">// module 07</div>
+    <h1>TCP vs UDP</h1>
+    <p class="lede">Both TCP and UDP sit at the Transport layer and both use port numbers to reach the right app — but they make opposite trade-offs. TCP spends time and overhead guaranteeing delivery. UDP skips all of that for speed.</p>
+
+    <div class="panel">
+      <div class="tabs2">
+        <button class="topo-tab active" id="tcpTab" style="font-family:var(--mono);font-size:0.82rem;padding:0.5rem 1rem;border-radius:6px;border:1px solid var(--cyan);color:var(--cyan);background:var(--cyan-dim);cursor:pointer">TCP</button>
+        <button class="topo-tab" id="udpTab" style="font-family:var(--mono);font-size:0.82rem;padding:0.5rem 1rem;border-radius:6px;border:1px solid var(--border-hi);color:var(--text-2);background:var(--bg-panel);cursor:pointer">UDP</button>
+      </div>
+      <div class="seq-header"><span>Client</span><span>Server</span></div>
+      <div class="seq-lane">
+        <div class="seq-rail left"></div>
+        <div class="seq-rail right"></div>
+        <div id="rows"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="playSeq">▶ Run</button>
+        <button class="btn secondary" id="resetSeq">Reset</button>
+      </div>
+      <p class="lede caption-box" id="seqCaption"></p>
+    </div>
+
+    <h2>Side by side</h2>
+    <table class="compare-table">
+      <thead><tr><th></th><th>TCP</th><th>UDP</th></tr></thead>
+      <tbody>
+        <tr><td>Connection</td><td>Set up first (3-way handshake)</td><td>None — just send</td></tr>
+        <tr><td>Reliability</td><td>Lost data is detected &amp; resent</td><td>Lost data just... stays lost</td></tr>
+        <tr><td>Ordering</td><td>Reassembled in the right order</td><td>Not guaranteed</td></tr>
+        <tr><td>Speed / overhead</td><td>Slower, more overhead</td><td>Fast, minimal overhead</td></tr>
+        <tr><td>Typical use</td><td>Web pages, email, file transfer</td><td>Video calls, live streaming, DNS</td></tr>
+      </tbody>
+    </table>
+    <div class="callout">UDP isn't "worse" — it's a deliberate choice. A dropped word in a live video call is barely noticeable and resending it late would be pointless; but a dropped chunk of a downloaded file would corrupt it. Each protocol fits different traffic.</div>
+
+    <div class="footer-nav">
+      <a href="routing.html">← Routing</a>
+      <a href="dns-http.html">Next: DNS &amp; HTTP →</a>
+    </div>
+  </main>
+</div>
+<script src="js/nav.js"></script>
+<script src="js/main.js"></script>
+<script>
+const TCP_STEPS = [
+  { dir: 'right', label: 'SYN (seq=0)' },
+  { dir: 'left',  label: 'SYN-ACK (seq=0, ack=1)' },
+  { dir: 'right', label: 'ACK (ack=1) — connected' },
+  { dir: 'right', label: 'DATA segment 1' },
+  { dir: 'left',  label: 'ACK segment 1' },
+  { dir: 'right', label: 'DATA segment 2' },
+  { dir: 'left',  label: 'ACK segment 2' },
+];
+const UDP_STEPS = [
+  { dir: 'right', label: 'DATA datagram 1' },
+  { dir: 'right', label: 'DATA datagram 2', lost: true },
+  { dir: 'right', label: 'DATA datagram 3' },
+];
+
+let mode = 'tcp';
+const rowsEl = document.getElementById('rows');
+const caption = document.getElementById('seqCaption');
+
+function buildRows(steps) {
+  rowsEl.innerHTML = '';
+  steps.forEach((s, i) => {
+    const row = document.createElement('div');
+    row.className = 'seq-row';
+    row.innerHTML = `
+      <div class="seq-label ${s.lost ? 'lost-label' : ''}" id="label-${i}">${s.label}</div>
+      <div class="seq-track">
+        <div class="seq-dot ${s.lost ? 'lost' : ''}" id="dot-${i}"></div>
+      </div>`;
+    rowsEl.appendChild(row);
+  });
+}
+buildRows(TCP_STEPS);
+
+function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+async function playSeq() {
+  const steps = mode === 'tcp' ? TCP_STEPS : UDP_STEPS;
+  document.getElementById('playSeq').disabled = true;
+  reset();
+  caption.textContent = mode === 'tcp' ? 'Establishing the connection…' : 'Sending datagrams with no setup…';
+
+  for (let i=0;i<steps.length;i++) {
+    const s = steps[i];
+    const dot = document.getElementById('dot-' + i);
+    const track = dot.parentElement;
+    const width = track.clientWidth;
+    dot.style.opacity = 1;
+    const goingRight = s.dir === 'right';
+    const stopAt = s.lost ? 0.5 : 1;
+    await new Promise(resolve => {
+      const start = performance.now();
+      function step(now) {
+        const t = Math.min(1, (now - start) / 750) * stopAt;
+        const pos = goingRight ? t * (width - 11) : (1 - t) * (width - 11);
+        dot.style.left = pos + 'px';
+        if (t < stopAt) requestAnimationFrame(step); else resolve();
+      }
+      requestAnimationFrame(step);
+    });
+    if (s.lost) {
+      caption.textContent = `${s.label} never arrives — and UDP has no mechanism to notice or resend it.`;
+    } else if (i === 2 && mode === 'tcp') {
+      caption.textContent = 'Handshake complete — both sides now agree the connection is open.';
+    } else {
+      caption.textContent = s.label;
+    }
+    await wait(350);
+  }
+  if (mode === 'tcp') caption.textContent = 'Every segment was acknowledged — TCP confirms delivery end to end.';
+  else caption.textContent = 'Datagram 2 was silently lost. UDP finished anyway — delivery was never guaranteed.';
+  document.getElementById('playSeq').disabled = false;
+}
+
+function reset() {
+  const steps = mode === 'tcp' ? TCP_STEPS : UDP_STEPS;
+  steps.forEach((s,i) => {
+    const dot = document.getElementById('dot-' + i);
+    if (!dot) return;
+    dot.style.opacity = 0;
+    dot.style.left = (s.dir === 'right' ? 0 : '') + 'px';
+  });
+  caption.textContent = '';
+}
+
+document.getElementById('playSeq').addEventListener('click', playSeq);
+document.getElementById('resetSeq').addEventListener('click', reset);
+document.getElementById('tcpTab').addEventListener('click', () => {
+  mode = 'tcp';
+  document.getElementById('tcpTab').style.color = 'var(--cyan)'; document.getElementById('tcpTab').style.borderColor='var(--cyan)'; document.getElementById('tcpTab').style.background='var(--cyan-dim)';
+  document.getElementById('udpTab').style.color = 'var(--text-2)'; document.getElementById('udpTab').style.borderColor='var(--border-hi)'; document.getElementById('udpTab').style.background='var(--bg-panel)';
+  buildRows(TCP_STEPS); caption.textContent='';
+});
+document.getElementById('udpTab').addEventListener('click', () => {
+  mode = 'udp';
+  document.getElementById('udpTab').style.color = 'var(--cyan)'; document.getElementById('udpTab').style.borderColor='var(--cyan)'; document.getElementById('udpTab').style.background='var(--cyan-dim)';
+  document.getElementById('tcpTab').style.color = 'var(--text-2)'; document.getElementById('tcpTab').style.borderColor='var(--border-hi)'; document.getElementById('tcpTab').style.background='var(--bg-panel)';
+  buildRows(UDP_STEPS); caption.textContent='';
+});
+</script>
+</body>
+</html>

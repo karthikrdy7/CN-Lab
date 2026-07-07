@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IP Addressing &amp; Subnets — NETSTACK</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .calc-row { display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap; }
+  .calc-row input { width: 170px; font-size: 1rem; padding: 0.6rem 0.8rem; }
+  .calc-row .slash { font-family: var(--mono); color: var(--text-3); font-size: 1.2rem; }
+  .calc-row input#cidr { width: 60px; }
+
+  .binary-wrap { margin-top: 1.6rem; }
+  .octet-row { display: flex; gap: 4px; margin-bottom: 6px; }
+  .bit {
+    width: 26px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 0.85rem; font-weight: 600;
+    border-radius: 3px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+  }
+  .bit.net { color: var(--amber); border-color: rgba(245,166,35,0.4); background: var(--amber-dim); }
+  .bit.host { color: var(--cyan); border-color: rgba(76,201,240,0.4); background: var(--cyan-dim); }
+  .octet-dot { color: var(--text-3); align-self: center; padding: 0 2px; }
+
+  .result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap: 0.9rem; margin-top: 1.6rem; }
+  .result-item { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.7rem 0.9rem; }
+  .result-item .rlabel { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-3); display:block; margin-bottom:0.2rem; }
+  .result-item .rvalue { font-family: var(--mono); color: var(--text-1); font-size: 1rem; }
+
+  .presets { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.8rem 0 1.4rem; }
+  .preset-btn { font-family: var(--mono); font-size: 0.75rem; background: var(--bg-panel-2); border: 1px solid var(--border-hi); color: var(--text-2); border-radius: 999px; padding: 0.3rem 0.75rem; cursor: pointer; }
+  .preset-btn:hover { color: var(--text-1); border-color: var(--cyan); }
+  .error-msg { color: var(--red); font-family: var(--mono); font-size: 0.85rem; min-height: 1.2em; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar-slot"></aside>
+  <main>
+    <div class="page-eyebrow">// module 04</div>
+    <h1>IP Addressing &amp; Subnets</h1>
+    <p class="lede">An IPv4 address is 32 bits, usually written as four decimal numbers (0–255) separated by dots. A <b style="color:var(--text-1)">subnet mask</b> — or the <code>/24</code>-style CIDR notation — decides how many of those 32 bits identify the <span style="color:var(--amber)">network</span> and how many identify a specific <span style="color:var(--cyan)">host</span> on it.</p>
+
+    <div class="panel">
+      <div class="calc-row">
+        <input type="text" id="ipInput" value="192.168.1.50" class="mono">
+        <span class="slash">/</span>
+        <input type="number" id="cidr" value="24" min="0" max="32" class="mono">
+        <button class="btn" id="calcBtn">Calculate</button>
+      </div>
+      <div class="presets" id="presets"></div>
+      <div class="error-msg" id="errorMsg"></div>
+
+      <div class="binary-wrap" id="binaryWrap"></div>
+
+      <div class="result-grid" id="resultGrid"></div>
+    </div>
+
+    <h2>How to read it</h2>
+    <p>Take <code>192.168.1.50/24</code>. The <code>/24</code> means the first 24 bits (the first 3 octets: <code>192.168.1</code>) are the network portion — fixed for every device on this subnet. The remaining 8 bits (the last octet) identify one specific host, and can range from 0–255, giving 256 possible values. Two of those are reserved (the network address itself, and the broadcast address), leaving 254 usable host addresses.</p>
+
+    <div class="callout">A smaller CIDR number (like /16) means fewer network bits and more host bits — a bigger subnet with room for more devices. A larger CIDR number (like /30) means almost no room for hosts, often used for point-to-point links between two routers.</div>
+
+    <div class="footer-nav">
+      <a href="topologies.html">← Network Topologies</a>
+      <a href="switching.html">Next: Switching →</a>
+    </div>
+  </main>
+</div>
+<script src="js/nav.js"></script>
+<script src="js/main.js"></script>
+<script>
+function ipToInt(ip) {
+  const parts = ip.trim().split('.');
+  if (parts.length !== 4) return null;
+  const nums = parts.map(p => Number(p));
+  if (nums.some(n => !Number.isInteger(n) || n < 0 || n > 255)) return null;
+  return ((nums[0] << 24) | (nums[1] << 16) | (nums[2] << 8) | nums[3]) >>> 0;
+}
+function intToIp(int) {
+  return [(int >>> 24) & 255, (int >>> 16) & 255, (int >>> 8) & 255, int & 255].join('.');
+}
+function intToBinary(int) {
+  return (int >>> 0).toString(2).padStart(32, '0');
+}
+
+const presets = [
+  { label: 'Home Wi-Fi', ip: '192.168.1.50', cidr: 24 },
+  { label: 'Office /26', ip: '10.0.5.10', cidr: 26 },
+  { label: 'Router link /30', ip: '203.0.113.1', cidr: 30 },
+  { label: 'Large LAN /16', ip: '172.16.4.20', cidr: 16 },
+];
+const presetsEl = document.getElementById('presets');
+presets.forEach(p => {
+  const b = document.createElement('button');
+  b.className = 'preset-btn';
+  b.textContent = p.label;
+  b.addEventListener('click', () => {
+    document.getElementById('ipInput').value = p.ip;
+    document.getElementById('cidr').value = p.cidr;
+    calculate();
+  });
+  presetsEl.appendChild(b);
+});
+
+function calculate() {
+  const ipStr = document.getElementById('ipInput').value;
+  const cidr = Number(document.getElementById('cidr').value);
+  const errorEl = document.getElementById('errorMsg');
+  const ipInt = ipToInt(ipStr);
+
+  if (ipInt === null) { errorEl.textContent = 'Enter a valid IPv4 address, e.g. 192.168.1.1'; return; }
+  if (!Number.isInteger(cidr) || cidr < 0 || cidr > 32) { errorEl.textContent = 'CIDR must be a number between 0 and 32'; return; }
+  errorEl.textContent = '';
+
+  const mask = cidr === 0 ? 0 : (0xFFFFFFFF << (32 - cidr)) >>> 0;
+  const network = (ipInt & mask) >>> 0;
+  const broadcast = (network | (~mask >>> 0)) >>> 0;
+  const hostBits = 32 - cidr;
+  const totalHosts = Math.pow(2, hostBits);
+  const usable = hostBits <= 1 ? 0 : totalHosts - 2;
+  const firstHost = hostBits <= 1 ? network : network + 1;
+  const lastHost = hostBits <= 1 ? broadcast : broadcast - 1;
+
+  // binary breakdown
+  const bin = intToBinary(ipInt);
+  const wrap = document.getElementById('binaryWrap');
+  wrap.innerHTML = '';
+  const row = document.createElement('div');
+  row.className = 'octet-row';
+  for (let i = 0; i < 32; i++) {
+    if (i > 0 && i % 8 === 0) {
+      const dot = document.createElement('span');
+      dot.className = 'octet-dot';
+      dot.textContent = '.';
+      row.appendChild(dot);
+    }
+    const bit = document.createElement('div');
+    bit.className = 'bit ' + (i < cidr ? 'net' : 'host');
+    bit.textContent = bin[i];
+    row.appendChild(bit);
+  }
+  wrap.appendChild(row);
+  const capt = document.createElement('p');
+  capt.className = 'lede';
+  capt.style.marginTop = '0.6rem';
+  capt.innerHTML = `<span style="color:var(--amber)">■ network bits (${cidr})</span> &nbsp; <span style="color:var(--cyan)">■ host bits (${hostBits})</span>`;
+  wrap.appendChild(capt);
+
+  const results = [
+    ['Subnet mask', intToIp(mask)],
+    ['Network address', intToIp(network)],
+    ['Broadcast address', intToIp(broadcast)],
+    ['First usable host', hostBits <= 1 ? '—' : intToIp(firstHost)],
+    ['Last usable host', hostBits <= 1 ? '—' : intToIp(lastHost)],
+    ['Usable hosts', usable.toLocaleString()],
+  ];
+  const grid = document.getElementById('resultGrid');
+  grid.innerHTML = '';
+  results.forEach(([label, value]) => {
+    const item = document.createElement('div');
+    item.className = 'result-item';
+    item.innerHTML = `<span class="rlabel">${label}</span><span class="rvalue">${value}</span>`;
+    grid.appendChild(item);
+  });
+}
+
+document.getElementById('calcBtn').addEventListener('click', calculate);
+['ipInput','cidr'].forEach(id => {
+  document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') calculate(); });
+});
+calculate();
+</script>
+</body>
+</html>

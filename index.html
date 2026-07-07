@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NETSTACK — Learn Computer Networks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .hero {
+    position: relative;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--bg-panel);
+    padding: 2.4rem;
+    overflow: hidden;
+    margin-bottom: 2rem;
+  }
+  .hero-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 2rem; align-items: center; }
+  .hero h1 { margin-bottom: 0.6rem; }
+  .hero .lede { margin-bottom: 1.4rem; }
+  .hero-diagram { width: 100%; height: auto; }
+  .node-label { font-family: var(--mono); font-size: 11px; fill: var(--text-2); }
+  .hop-label { font-family: var(--mono); font-size: 9px; fill: var(--text-3); }
+
+  @media (max-width: 760px) {
+    .hero-grid { grid-template-columns: 1fr; }
+  }
+
+  .stat-row { display: flex; gap: 1.6rem; margin-top: 1.4rem; flex-wrap: wrap; }
+  .stat { font-family: var(--mono); }
+  .stat b { display: block; color: var(--cyan); font-size: 1.1rem; }
+  .stat span { font-size: 0.72rem; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .why-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 1.6rem 0 2.2rem; }
+  @media (max-width: 760px) { .why-grid { grid-template-columns: 1fr; } }
+  .why-item h4 { color: var(--text-1); font-size: 0.95rem; margin-bottom: 0.3rem; }
+  .why-item p { font-size: 0.85rem; margin: 0; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-led"></span>
+      <span>
+        <span class="brand-name">NETSTACK</span>
+        <span class="brand-sub">learn computer networks</span>
+      </span>
+    </div>
+    <div class="nav-group-label">Start here</div>
+    <a class="nav-port" href="index.html"><span class="port-num">00</span><span class="port-led"></span> Home</a>
+    <div class="nav-group-label">Foundations</div>
+    <a class="nav-port" href="osi-model.html"><span class="port-num">01</span><span class="port-led"></span> The OSI Model</a>
+    <a class="nav-port" href="tcpip-model.html"><span class="port-num">02</span><span class="port-led"></span> TCP/IP Model</a>
+    <a class="nav-port" href="topologies.html"><span class="port-num">03</span><span class="port-led"></span> Network Topologies</a>
+    <div class="nav-group-label">Addressing &amp; delivery</div>
+    <a class="nav-port" href="ip-addressing.html"><span class="port-num">04</span><span class="port-led"></span> IP Addressing &amp; Subnets</a>
+    <a class="nav-port" href="switching.html"><span class="port-num">05</span><span class="port-led"></span> Switching (Layer 2)</a>
+    <a class="nav-port" href="routing.html"><span class="port-num">06</span><span class="port-led"></span> Routing (Layer 3)</a>
+    <div class="nav-group-label">Transport &amp; apps</div>
+    <a class="nav-port" href="tcp-udp.html"><span class="port-num">07</span><span class="port-led"></span> TCP vs UDP</a>
+    <a class="nav-port" href="dns-http.html"><span class="port-num">08</span><span class="port-led"></span> DNS &amp; HTTP</a>
+    <div class="nav-group-label">Lab &amp; projects</div>
+    <a class="nav-port" href="network-lab.html"><span class="port-num">✦</span><span class="port-led"></span> Network Lab</a>
+  </aside>
+
+  <main>
+    <div class="hero">
+      <div class="hero-grid">
+        <div>
+          <div class="page-eyebrow">// a beginner's guide</div>
+          <h1>See how data<br>actually travels.</h1>
+          <p class="lede">Every page you load is really a packet hopping between machines — encapsulated, addressed, routed, and reassembled in milliseconds. NETSTACK builds that intuition with hands-on simulations instead of walls of text.</p>
+          <div class="btn-row">
+            <a class="btn" href="osi-model.html">Start with the OSI model →</a>
+          </div>
+          <div class="stat-row">
+            <div class="stat"><b>8</b><span>interactive modules</span></div>
+            <div class="stat"><b>0</b><span>prior experience needed</span></div>
+            <div class="stat"><b>~2hrs</b><span>to finish the syllabus</span></div>
+          </div>
+        </div>
+        <svg class="hero-diagram" viewBox="0 0 380 220" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="dot" markerWidth="4" markerHeight="4"><circle cx="2" cy="2" r="2" fill="var(--text-3)"/></marker>
+          </defs>
+          <path id="heroPath" d="M 50 170 C 110 170, 90 60, 160 60 S 260 170, 330 170" fill="none" stroke="var(--border-hi)" stroke-width="2" stroke-dasharray="1 7" stroke-linecap="round"/>
+          <!-- You -->
+          <rect x="26" y="150" width="48" height="34" rx="4" fill="var(--bg-panel-2)" stroke="var(--border-hi)"/>
+          <rect x="34" y="157" width="32" height="18" rx="2" fill="var(--bg)" stroke="var(--border-hi)"/>
+          <text x="50" y="200" text-anchor="middle" class="node-label">you</text>
+          <!-- Router -->
+          <circle cx="160" cy="60" r="22" fill="var(--bg-panel-2)" stroke="var(--cyan)" stroke-width="1.5"/>
+          <path d="M150 60h20M160 50v20M153 53l14 14M167 53l-14 14" stroke="var(--cyan)" stroke-width="1.2" opacity="0.7"/>
+          <text x="160" y="96" text-anchor="middle" class="node-label">router</text>
+          <!-- Server -->
+          <rect x="306" y="150" width="48" height="34" rx="4" fill="var(--bg-panel-2)" stroke="var(--border-hi)"/>
+          <rect x="313" y="157" width="34" height="6" rx="1" fill="var(--green)" opacity="0.6"/>
+          <rect x="313" y="167" width="34" height="6" rx="1" fill="var(--border-hi)"/>
+          <text x="330" y="200" text-anchor="middle" class="node-label">server</text>
+          <circle id="heroPacket" cx="50" cy="170" r="5" fill="var(--cyan)" style="filter:drop-shadow(0 0 6px var(--cyan))"/>
+        </svg>
+      </div>
+    </div>
+
+    <h2>Why learn it this way</h2>
+    <div class="why-grid">
+      <div class="why-item">
+        <h4>Simulate, don't memorize</h4>
+        <p>Drag a subnet mask, run a handshake, watch a router pick a path — the concept sticks because you caused it.</p>
+      </div>
+      <div class="why-item">
+        <h4>Built layer by layer</h4>
+        <p>Modules follow the actual OSI stack, from physical addressing up to the HTTP request your browser just sent.</p>
+      </div>
+      <div class="why-item">
+        <h4>No assumed background</h4>
+        <p>Every term is defined the first time it appears. If you know what a "file" is, you're ready to start.</p>
+      </div>
+    </div>
+
+    <h2>The syllabus</h2>
+    <p class="lede">Go in order — each module builds on the last — or jump straight to what you need.</p>
+    <div class="card-grid">
+      <a class="topic-card" href="osi-model.html"><span class="num">01</span><h3>The OSI Model</h3><p>The 7-layer map every other topic here refers back to.</p></a>
+      <a class="topic-card" href="tcpip-model.html"><span class="num">02</span><h3>TCP/IP Model</h3><p>The 4-layer model the real internet is actually built on.</p></a>
+      <a class="topic-card" href="topologies.html"><span class="num">03</span><h3>Network Topologies</h3><p>Star, bus, ring, mesh — how devices physically connect.</p></a>
+      <a class="topic-card" href="ip-addressing.html"><span class="num">04</span><h3>IP Addressing &amp; Subnets</h3><p>Live subnet calculator with a binary breakdown.</p></a>
+      <a class="topic-card" href="switching.html"><span class="num">05</span><h3>Switching</h3><p>Watch a switch learn MAC addresses frame by frame.</p></a>
+      <a class="topic-card" href="routing.html"><span class="num">06</span><h3>Routing</h3><p>Pick two routers and watch the shortest path get chosen.</p></a>
+      <a class="topic-card" href="tcp-udp.html"><span class="num">07</span><h3>TCP vs UDP</h3><p>Run the 3-way handshake, then see UDP just... not bother.</p></a>
+      <a class="topic-card" href="dns-http.html"><span class="num">08</span><h3>DNS &amp; HTTP</h3><p>What really happens between typing a URL and seeing a page.</p></a>
+    </div>
+  </main>
+</div>
+<script src="js/main.js"></script>
+<script>
+  const path = document.getElementById('heroPath');
+  const packet = document.getElementById('heroPacket');
+  function loop() {
+    animateAlongPath(packet, path, { duration: 2200, onDone: () => setTimeout(loop, 500) });
+  }
+  loop();
+</script>
+</body>
+</html>

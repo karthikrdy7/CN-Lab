@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Network Lab — NETSTACK</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .lab-container {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 1.6rem;
+    margin-top: 1.6rem;
+  }
+
+  @media (max-width: 1024px) {
+    .lab-container {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .device-palette {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.2rem;
+    height: fit-content;
+    position: sticky;
+    top: 120px;
+  }
+
+  .device-palette h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: var(--text-1);
+    font-size: 0.95rem;
+  }
+
+  .device-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.6rem;
+  }
+
+  .device-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.8rem;
+    background: var(--bg-panel-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: grab;
+    transition: all 0.15s;
+    font-size: 0.8rem;
+    color: var(--text-2);
+    user-select: none;
+  }
+
+  .device-btn:hover {
+    background: var(--bg-raised);
+    border-color: var(--border-hi);
+    color: var(--cyan);
+  }
+
+  .device-btn:active {
+    cursor: grabbing;
+  }
+
+  .device-emoji {
+    font-size: 1.6rem;
+  }
+
+  .device-name {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-align: center;
+    line-height: 1.2;
+  }
+
+  .canvas-area {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 2rem;
+    min-height: 600px;
+    position: relative;
+    overflow: auto;
+  }
+
+  .canvas-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.6rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .canvas-header h3 {
+    margin: 0;
+    color: var(--text-1);
+  }
+
+  .canvas-tools {
+    display: flex;
+    gap: 0.6rem;
+  }
+
+  .icon-btn {
+    padding: 0.5rem 0.8rem;
+    background: var(--bg-panel-2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-2);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.15s;
+  }
+
+  .icon-btn:hover {
+    background: var(--bg-raised);
+    border-color: var(--cyan);
+    color: var(--cyan);
+  }
+
+  .canvas-content {
+    position: relative;
+    min-height: 500px;
+    background: 
+      radial-gradient(circle at 20px 20px, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-position: 0 0;
+  }
+
+  .network-node {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: move;
+    user-select: none;
+    padding: 0.6rem;
+    background: var(--bg-panel-2);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    transition: all 0.15s;
+  }
+
+  .network-node:hover {
+    border-color: var(--cyan);
+    box-shadow: 0 0 12px rgba(76, 201, 240, 0.3);
+  }
+
+  .network-node.selected {
+    border-color: var(--cyan);
+    box-shadow: 0 0 16px var(--cyan-dim);
+  }
+
+  .network-node.dragging {
+    opacity: 0.7;
+    z-index: 1000;
+  }
+
+  .node-emoji {
+    font-size: 1.8rem;
+  }
+
+  .node-label {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--text-3);
+    text-align: center;
+    max-width: 60px;
+    word-break: break-word;
+  }
+
+  .node-delete {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 20px;
+    height: 20px;
+    background: var(--red);
+    border: 1px solid var(--bg);
+    border-radius: 50%;
+    color: white;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .network-node:hover .node-delete {
+    opacity: 1;
+  }
+
+  .empty-state {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: var(--text-3);
+  }
+
+  .empty-state-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+  }
+
+  .connection-line {
+    position: absolute;
+    stroke: var(--border-hi);
+    stroke-width: 2;
+    fill: none;
+    pointer-events: none;
+  }
+
+  .connection-line.active {
+    stroke: var(--cyan);
+    stroke-dasharray: 4 4;
+  }
+
+  /* Cable type styles */
+  .cable-ethernet {
+    stroke: var(--green);
+    stroke-width: 2.5;
+  }
+
+  .cable-fiber {
+    stroke: var(--violet);
+    stroke-width: 2;
+    stroke-dasharray: 2 4;
+  }
+
+  .cable-wireless {
+    stroke: var(--cyan);
+    stroke-width: 2;
+    stroke-dasharray: 6 2;
+  }
+
+  .cable-power {
+    stroke: var(--red);
+    stroke-width: 2;
+  }
+
+  /* Cable label */
+  .cable-label {
+    position: absolute;
+    background: var(--bg-panel-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.7rem;
+    color: var(--text-2);
+    font-family: var(--mono);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 100;
+  }
+
+  .cable-label.visible {
+    opacity: 1;
+  }
+
+  .cable-label .type {
+    color: var(--cyan);
+    font-weight: 600;
+  }
+
+  .cable-label .speed {
+    color: var(--text-3);
+    font-size: 0.65rem;
+  }
+
+  .cable-type-selector {
+    position: fixed;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.8rem;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    z-index: 2000;
+    display: none;
+  }
+
+  .cable-type-selector.visible {
+    display: block;
+  }
+
+  .cable-type-option {
+    padding: 0.5rem 0.8rem;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    transition: all 0.15s;
+    margin-bottom: 0.3rem;
+    font-family: var(--mono);
+  }
+
+  .cable-type-option:last-child {
+    margin-bottom: 0;
+  }
+
+  .cable-type-option:hover {
+    background: var(--bg-panel-2);
+  }
+
+  .cable-type-option.selected {
+    background: var(--cyan-dim);
+    color: var(--cyan);
+    border: 1px solid var(--cyan);
+  }
+
+  .info-panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.2rem;
+    margin-top: 1.6rem;
+  }
+
+  .info-panel h4 {
+    margin-top: 0;
+    color: var(--text-1);
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  @media (max-width: 600px) {
+    .stats-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .stat-item {
+    background: var(--bg-panel-2);
+    padding: 0.8rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    text-align: center;
+  }
+
+  .stat-item .stat-value {
+    font-family: var(--mono);
+    font-size: 1.4rem;
+    color: var(--cyan);
+    font-weight: 600;
+  }
+
+  .stat-item .stat-label {
+    font-size: 0.75rem;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 0.3rem;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="sidebar-slot"></aside>
+  <main>
+    <div class="page-eyebrow">// interactive lab</div>
+    <h1>Network Lab</h1>
+    <p class="lede">Build your own network by dragging devices onto the canvas. Create topologies, visualize connections, and understand how real networks are structured.</p>
+
+    <div class="lab-container">
+      <!-- Device Palette -->
+      <div class="device-palette">
+        <h3>Network Devices</h3>
+        <div class="device-grid">
+          <div class="device-btn" draggable="true" data-type="pc" data-emoji="🖥">
+            <div class="device-emoji">🖥</div>
+            <div class="device-name">PC</div>
+          </div>
+          <div class="device-btn" draggable="true" data-type="laptop" data-emoji="💻">
+            <div class="device-emoji">💻</div>
+            <div class="device-name">Laptop</div>
+          </div>
+          <div class="device-btn" draggable="true" data-type="mobile" data-emoji="📱">
+            <div class="device-emoji">📱</div>
+            <div class="device-name">Mobile</div>
+          </div>
+          <div class="device-btn" draggable="true" data-type="printer" data-emoji="🖨">
+            <div class="device-emoji">🖨</div>
+            <div class="device-name">Printer</div>
+          </div>
+          <div class="device-btn" draggable="true" data-type="server" data-emoji="🖥">
+            <div class="device-emoji">🖥</div>
+            <div class="device-name">Server</div>
+          </div>
+          <div class="device-btn" draggable="true" data-type="switch" data-emoji="🔀">
+            <div class="device-emoji">🔀</div>
+            <div class="device-name">Switch</div>
+          </div>
+          <div class="device-btn" draggable="true" data-type="router" data-emoji="🌐">
+            <div class="device-emoji">🌐</div>
+            <div class="device-name">Router</div>
+          </div>
+          <div class="device-btn" draggable="true" data-type="access-point" data-emoji="📡">
+            <div class="device-emoji">📡</div>
+            <div class="device-name">Access Point</div>
+          </div>
+          <div class="device-btn" draggable="true" data-type="firewall" data-emoji="🛡">
+            <div class="device-emoji">🛡</div>
+            <div class="device-name">Firewall</div>
+          </div>
+          <div class="device-btn" draggable="true" data-type="internet" data-emoji="☁">
+            <div class="device-emoji">☁</div>
+            <div class="device-name">Internet</div>
+          </div>
+          <div class="device-btn" draggable="true" data-type="dns-server" data-emoji="🌍">
+            <div class="device-emoji">🌍</div>
+            <div class="device-name">DNS Server</div>
+          </div>
+          <div class="device-btn" draggable="true" data-type="dhcp-server" data-emoji="📦">
+            <div class="device-emoji">📦</div>
+            <div class="device-name">DHCP Server</div>
+          </div>
+          <div class="device-btn" draggable="true" data-type="mail-server" data-emoji="📧">
+            <div class="device-emoji">📧</div>
+            <div class="device-name">Mail Server</div>
+          </div>
+          <div class="device-btn" draggable="true" data-type="load-balancer" data-emoji="⚖">
+            <div class="device-emoji">⚖</div>
+            <div class="device-name">Load Balancer</div>
+          </div>
+          <div class="device-btn" draggable="true" data-type="vpn-gateway" data-emoji="🔒">
+            <div class="device-emoji">🔒</div>
+            <div class="device-name">VPN Gateway</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Canvas Area -->
+      <div>
+        <div class="canvas-area">
+          <div class="canvas-header">
+            <h3>Network Canvas</h3>
+            <div class="canvas-tools">
+              <button class="icon-btn" id="connectMode" title="Connect two devices">🔗 Connect</button>
+              <button class="icon-btn" id="clearCanvas" title="Clear all">🗑 Clear</button>
+            </div>
+          </div>
+          <svg class="connection-line" id="connectionsSvg" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></svg>
+          <div id="cableTypeSelector" class="cable-type-selector"></div>
+          <div class="canvas-content" id="canvasContent">
+            <div class="empty-state">
+              <div class="empty-state-icon">🌐</div>
+              <p>Drag devices here to build your network</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Info Panel -->
+        <div class="info-panel">
+          <h4>Network Statistics</h4>
+          <div class="stats-grid">
+            <div class="stat-item">
+              <div class="stat-value" id="deviceCount">0</div>
+              <div class="stat-label">Devices</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" id="connectionCount">0</div>
+              <div class="stat-label">Connections</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value" id="nodeCount">0</div>
+              <div class="stat-label">Nodes</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="js/nav.js"></script>
+<script>
+// Cable types with properties
+const cableTypes = {
+  ethernet: {
+    name: 'Ethernet',
+    speed: '1 Gbps',
+    latency: '0.1 ms',
+    class: 'cable-ethernet',
+    icon: '🔌',
+    maxLength: 100
+  },
+  fiber: {
+    name: 'Fiber Optic',
+    speed: '100 Gbps',
+    latency: '0.002 ms',
+    class: 'cable-fiber',
+    icon: '💡',
+    maxLength: 10000
+  },
+  wireless: {
+    name: 'Wireless (WiFi)',
+    speed: '300 Mbps',
+    latency: '1-5 ms',
+    class: 'cable-wireless',
+    icon: '📶',
+    maxLength: 300
+  },
+  power: {
+    name: 'Power Cable',
+    speed: 'N/A',
+    latency: 'N/A',
+    class: 'cable-power',
+    icon: '⚡',
+    maxLength: 30
+  }
+};
+
+// Device connection capabilities
+const deviceCapabilities = {
+  'pc': { wired: ['ethernet'], wireless: ['wireless'], power: true },
+  'laptop': { wired: ['ethernet'], wireless: ['wireless'], power: true },
+  'mobile': { wireless: ['wireless'], power: true },
+  'printer': { wired: ['ethernet'], wireless: ['wireless'], power: true },
+  'server': { wired: ['ethernet', 'fiber'], power: true },
+  'switch': { wired: ['ethernet', 'fiber'], power: true },
+  'router': { wired: ['ethernet', 'fiber'], wireless: ['wireless'], power: true },
+  'access-point': { wired: ['ethernet'], wireless: ['wireless'], power: true },
+  'firewall': { wired: ['ethernet', 'fiber'], power: true },
+  'internet': { wired: ['fiber'], wireless: ['wireless'] },
+  'dns-server': { wired: ['ethernet', 'fiber'], power: true },
+  'dhcp-server': { wired: ['ethernet', 'fiber'], power: true },
+  'mail-server': { wired: ['ethernet', 'fiber'], power: true },
+  'load-balancer': { wired: ['ethernet', 'fiber'], power: true },
+  'vpn-gateway': { wired: ['ethernet', 'fiber'], power: true }
+};
+
+let draggedDevice = null;
+let nodes = [];
+let connections = [];
+let nodeIdCounter = 0;
+let connectMode = false;
+let selectedNode = null;
+let pendingConnection = null;
+
+const canvasContent = document.getElementById('canvasContent');
+const connectionsSvg = document.getElementById('connectionsSvg');
+const connectModeBtn = document.getElementById('connectMode');
+const clearCanvasBtn = document.getElementById('clearCanvas');
+const deviceBtns = document.querySelectorAll('.device-btn');
+const cableTypeSelector = document.getElementById('cableTypeSelector');
+
+const deviceLabels = {
+  'pc': 'PC',
+  'laptop': 'Laptop',
+  'mobile': 'Mobile',
+  'printer': 'Printer',
+  'server': 'Server',
+  'switch': 'Switch',
+  'router': 'Router',
+  'access-point': 'AP',
+  'firewall': 'Firewall',
+  'internet': 'Internet',
+  'dns-server': 'DNS',
+  'dhcp-server': 'DHCP',
+  'mail-server': 'Mail',
+  'load-balancer': 'LB',
+  'vpn-gateway': 'VPN'
+};
+
+// Check if two devices can connect with cable type
+function canConnect(fromType, toType, cableType) {
+  const fromCap = deviceCapabilities[fromType];
+  const toCap = deviceCapabilities[toType];
+  if (!fromCap || !toCap) return false;
+
+  if (cableType === 'power') {
+    return (fromCap.power || false) && (toCap.power || false);
+  } else if (cableType === 'wireless') {
+    const fromWireless = fromCap.wireless || [];
+    const toWireless = toCap.wireless || [];
+    return fromWireless.includes('wireless') && toWireless.includes('wireless');
+  } else {
+    const fromWired = fromCap.wired || [];
+    const toWired = toCap.wired || [];
+    return fromWired.includes(cableType) && toWired.includes(cableType);
+  }
+}
+
+// Get available cable types for two devices
+function getAvailableCables(fromType, toType) {
+  return Object.keys(cableTypes).filter(type => canConnect(fromType, toType, type));
+}
+
+// Drag from palette
+deviceBtns.forEach(btn => {
+  btn.addEventListener('dragstart', (e) => {
+    draggedDevice = {
+      type: btn.dataset.type,
+      emoji: btn.dataset.emoji
+    };
+    e.dataTransfer.effectAllowed = 'copy';
+  });
+
+  btn.addEventListener('dragend', () => {
+    draggedDevice = null;
+  });
+});
+
+canvasContent.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy';
+});
+
+canvasContent.addEventListener('drop', (e) => {
+  e.preventDefault();
+  if (!draggedDevice) return;
+
+  const rect = canvasContent.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  addNode(draggedDevice.type, draggedDevice.emoji, x, y);
+});
+
+function addNode(type, emoji, x, y) {
+  const id = nodeIdCounter++;
+  const node = {
+    id,
+    type,
+    emoji,
+    x,
+    y,
+    connections: []
+  };
+  nodes.push(node);
+
+  const nodeEl = document.createElement('div');
+  nodeEl.className = 'network-node';
+  nodeEl.dataset.id = id;
+  nodeEl.style.left = x + 'px';
+  nodeEl.style.top = y + 'px';
+  nodeEl.innerHTML = `
+    <div class="node-emoji">${emoji}</div>
+    <div class="node-label">${deviceLabels[type]}</div>
+    <div class="node-delete">✕</div>
+  `;
+
+  nodeEl.addEventListener('mousedown', (e) => {
+    if (e.target.classList.contains('node-delete')) {
+      deleteNode(id);
+      return;
+    }
+    if (connectMode) {
+      handleConnectionMode(id);
+      return;
+    }
+    dragNode(nodeEl, node, e);
+  });
+
+  nodeEl.addEventListener('click', (e) => {
+    if (!e.target.classList.contains('node-delete')) {
+      selectNode(nodeEl, id);
+    }
+  });
+
+  canvasContent.appendChild(nodeEl);
+  updateStats();
+  removeEmptyState();
+}
+
+function dragNode(el, node, e) {
+  let isMoving = false;
+  const startX = e.clientX;
+  const startY = e.clientY;
+  const startLeft = node.x;
+  const startTop = node.y;
+
+  function onMouseMove(e) {
+    isMoving = true;
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    node.x = startLeft + dx;
+    node.y = startTop + dy;
+    el.style.left = node.x + 'px';
+    el.style.top = node.y + 'px';
+    redrawConnections();
+  }
+
+  function onMouseUp() {
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+    if (isMoving) el.classList.remove('dragging');
+  }
+
+  el.classList.add('dragging');
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', onMouseUp);
+}
+
+function selectNode(el, id) {
+  document.querySelectorAll('.network-node').forEach(n => n.classList.remove('selected'));
+  if (selectedNode !== id) {
+    el.classList.add('selected');
+    selectedNode = id;
+  } else {
+    selectedNode = null;
+  }
+}
+
+function handleConnectionMode(id) {
+  if (!selectedNode) {
+    selectedNode = id;
+    document.querySelectorAll('.network-node').forEach(n => n.classList.remove('selected'));
+    document.querySelector(`[data-id="${id}"]`).classList.add('selected');
+  } else if (selectedNode !== id) {
+    const fromNode = nodes.find(n => n.id === selectedNode);
+    const toNode = nodes.find(n => n.id === id);
+    
+    const exists = connections.some(c => 
+      (c.from === selectedNode && c.to === id) || 
+      (c.from === id && c.to === selectedNode)
+    );
+    
+    if (exists) {
+      alert('Connection already exists!');
+      selectedNode = null;
+      document.querySelectorAll('.network-node').forEach(n => n.classList.remove('selected'));
+      return;
+    }
+
+    const availableCables = getAvailableCables(fromNode.type, toNode.type);
+    
+    if (availableCables.length === 0) {
+      alert(`Cannot connect ${deviceLabels[fromNode.type]} to ${deviceLabels[toNode.type]} - incompatible devices!`);
+      selectedNode = null;
+      document.querySelectorAll('.network-node').forEach(n => n.classList.remove('selected'));
+      return;
+    }
+
+    if (availableCables.length === 1) {
+      addConnection(selectedNode, id, availableCables[0]);
+      selectedNode = null;
+      document.querySelectorAll('.network-node').forEach(n => n.classList.remove('selected'));
+    } else {
+      showCableTypeSelector(selectedNode, id, availableCables, e);
+    }
+  }
+}
+
+function showCableTypeSelector(fromId, toId, availableCables, event) {
+  cableTypeSelector.innerHTML = '';
+  availableCables.forEach(type => {
+    const option = document.createElement('div');
+    option.className = 'cable-type-option';
+    const cable = cableTypes[type];
+    option.innerHTML = `<span class="type">${cable.icon} ${cable.name}</span><br><span class="speed">${cable.speed}</span>`;
+    option.addEventListener('click', () => {
+      addConnection(fromId, toId, type);
+      cableTypeSelector.classList.remove('visible');
+      selectedNode = null;
+      document.querySelectorAll('.network-node').forEach(n => n.classList.remove('selected'));
+    });
+    cableTypeSelector.appendChild(option);
+  });
+
+  cableTypeSelector.classList.add('visible');
+  cableTypeSelector.style.left = (event.clientX || 300) + 'px';
+  cableTypeSelector.style.top = (event.clientY || 300) + 'px';
+}
+
+function addConnection(fromId, toId, cableType) {
+  connections.push({ from: fromId, to: toId, type: cableType });
+  redrawConnections();
+  updateStats();
+}
+
+function deleteNode(id) {
+  nodes = nodes.filter(n => n.id !== id);
+  connections = connections.filter(c => c.from !== id && c.to !== id);
+  document.querySelector(`[data-id="${id}"]`).remove();
+  updateStats();
+  redrawConnections();
+  if (selectedNode === id) selectedNode = null;
+  if (nodes.length === 0) showEmptyState();
+}
+
+function redrawConnections() {
+  connectionsSvg.innerHTML = '';
+  
+  connections.forEach(conn => {
+    const fromNode = nodes.find(n => n.id === conn.from);
+    const toNode = nodes.find(n => n.id === conn.to);
+    
+    if (fromNode && toNode) {
+      const cable = cableTypes[conn.type];
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', fromNode.x + 45);
+      line.setAttribute('y1', fromNode.y + 45);
+      line.setAttribute('x2', toNode.x + 45);
+      line.setAttribute('y2', toNode.y + 45);
+      line.setAttribute('class', cable.class);
+      line.style.cursor = 'pointer';
+      
+      line.addEventListener('mouseenter', (e) => showCableLabel(conn, e));
+      line.addEventListener('mouseleave', () => hideCableLabel());
+      
+      connectionsSvg.appendChild(line);
+    }
+  });
+}
+
+function showCableLabel(conn, e) {
+  const cable = cableTypes[conn.type];
+  const label = document.createElement('div');
+  label.className = 'cable-label visible';
+  label.innerHTML = `<div class="type">${cable.icon} ${cable.name}</div><div class="speed">↓ ${cable.speed} | ↕ ${cable.latency}</div>`;
+  document.body.appendChild(label);
+  
+  label.style.left = e.clientX + 10 + 'px';
+  label.style.top = e.clientY + 10 + 'px';
+  label.dataset.tooltip = 'true';
+}
+
+function hideCableLabel() {
+  const labels = document.querySelectorAll('[data-tooltip="true"]');
+  labels.forEach(l => l.remove());
+}
+
+function updateStats() {
+  document.getElementById('deviceCount').textContent = nodes.length;
+  document.getElementById('connectionCount').textContent = connections.length;
+  document.getElementById('nodeCount').textContent = nodeIdCounter;
+}
+
+function showEmptyState() {
+  if (nodes.length === 0) {
+    const emptyState = document.createElement('div');
+    emptyState.className = 'empty-state';
+    emptyState.innerHTML = '<div class="empty-state-icon">🌐</div><p>Drag devices here to build your network</p>';
+    canvasContent.appendChild(emptyState);
+  }
+}
+
+function removeEmptyState() {
+  const emptyState = canvasContent.querySelector('.empty-state');
+  if (emptyState) emptyState.remove();
+}
+
+connectModeBtn.addEventListener('click', () => {
+  connectMode = !connectMode;
+  connectModeBtn.style.background = connectMode ? 'var(--cyan-dim)' : 'var(--bg-panel-2)';
+  connectModeBtn.style.borderColor = connectMode ? 'var(--cyan)' : 'var(--border)';
+  connectModeBtn.style.color = connectMode ? 'var(--cyan)' : 'var(--text-2)';
+  selectedNode = null;
+  cableTypeSelector.classList.remove('visible');
+  document.querySelectorAll('.network-node').forEach(n => n.classList.remove('selected'));
+});
+
+clearCanvasBtn.addEventListener('click', () => {
+  if (confirm('Clear all devices and connections?')) {
+    nodes = [];
+    connections = [];
+    nodeIdCounter = 0;
+    selectedNode = null;
+    connectionsSvg.innerHTML = '';
+    canvasContent.querySelectorAll('.network-node').forEach(n => n.remove());
+    updateStats();
+    showEmptyState();
+  }
+});
+
+// Close cable selector on canvas click
+canvasContent.addEventListener('click', () => {
+  cableTypeSelector.classList.remove('visible');
+});
+</script>
+</body>
+</html>
