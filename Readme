@@ -1,1 +1,132 @@
-git@github.com:karthikrdy7/CN-Lab.git
+# NETSTACK — Interactive Computer Networks Learning Platform
+
+A beginner-friendly, hands-on educational platform for learning computer networking fundamentals through interactive simulations and visualizations.
+
+## 🌐 Live Demo
+[View NETSTACK](https://netstack.example.com) — Start learning networks today!
+
+## Features
+
+### 📚 8 Interactive Modules
+- **Foundations**: OSI Model, TCP/IP Model, Network Topologies
+- **Addressing & Delivery**: IP Addressing & Subnets, Switching (Layer 2), Routing (Layer 3)
+- **Transport & Apps**: TCP vs UDP, DNS & HTTP
+- **Interactive Lab**: Build custom network topologies with drag-and-drop
+
+### 🎨 Network Lab (Interactive Simulator)
+Build real-world network topologies with:
+- **15 Network Devices**: PCs, Servers, Routers, Switches, Firewalls, Load Balancers, DNS/DHCP servers, and more
+- **4 Cable Types**:
+  - 🔌 Ethernet (1 Gbps, 0.1 ms latency)
+  - 💡 Fiber Optic (100 Gbps, 0.002 ms latency)
+  - 📶 Wireless WiFi (300 Mbps, 1-5 ms latency)
+  - ⚡ Power cables
+- **Smart Connection Validation**: Only compatible devices can connect
+- **Visual Cable Properties**: Hover to see speed and latency specs
+- **Drag & Drop Canvas**: Intuitive network building interface
+- **Real-time Statistics**: Track devices and connections
+
+### 🔧 Technology Stack
+- **HTML5** — Semantic markup
+- **CSS3** — Modern design tokens, responsive layouts
+- **Vanilla JavaScript** — No dependencies, lightweight (~3KB total)
+- **SVG** — Smooth path animations for packet visualization
+
+### 🎯 Design Philosophy
+- Zero prerequisites required
+- Learn by building, not reading
+- Visual, hands-on approach to complex concepts
+- Professional networking UI inspired by router/switch LEDs
+- Accessibility-first (reduced motion support, semantic HTML)
+
+## Project Structure
+```
+netsite/
+├── index.html              # Home page & introduction
+├── osi-model.html         # OSI 7-layer model
+├── tcpip-model.html       # TCP/IP model
+├── topologies.html        # Network topologies
+├── ip-addressing.html     # IP & subnetting
+├── switching.html         # Layer 2 switching
+├── routing.html           # Layer 3 routing
+├── tcp-udp.html          # Transport layer protocols
+├── dns-http.html         # Application layer services
+├── network-lab.html      # Interactive lab & simulator
+├── css/
+│   └── style.css         # Design system & components
+├── js/
+│   ├── nav.js            # Navigation & sidebar
+│   └── main.js           # Core animations
+└── Readme                # This file
+```
+
+## Color System
+- 🔵 **Cyan** (#4cc9f0) — Data in flight, active states
+- 🟢 **Green** (#3ddc84) — Link up, success, ACK
+- 🟡 **Amber** (#f5a623) — Warnings, collisions, retransmit
+- 🔴 **Red** (#ef4444) — Link down, dropped packets
+- 🟣 **Violet** (#8b7cf6) — Headers, secondary emphasis
+
+## Getting Started
+
+### View Locally
+```bash
+cd netsite
+python -m http.server 8000
+# Open http://localhost:8000
+```
+
+### Build a Network
+1. Go to **Network Lab** section
+2. Drag devices from the left palette onto the canvas
+3. Click **Connect** button and select two devices
+4. Choose compatible cable type from popup
+5. Hover over cables to see performance specs
+
+## Device Capabilities Matrix
+
+| Device | Ethernet | Fiber | Wireless | Power |
+|--------|----------|-------|----------|-------|
+| PC     | ✓        |       | ✓        | ✓     |
+| Laptop | ✓        |       | ✓        | ✓     |
+| Mobile |          |       | ✓        | ✓     |
+| Router | ✓        | ✓     | ✓        | ✓     |
+| Switch | ✓        | ✓     |          | ✓     |
+| Server | ✓        | ✓     |          | ✓     |
+| Firewall | ✓      | ✓     |          | ✓     |
+
+## Learning Path
+1. Start with **OSI Model** to understand layering
+2. Learn **TCP/IP Model** for practical implementation
+3. Explore **Network Topologies** for structural patterns
+4. Master **IP Addressing** for device communication
+5. Study **Switching & Routing** for packet forwarding
+6. Compare **TCP vs UDP** for transport decisions
+7. Understand **DNS & HTTP** for real-world applications
+8. **Build Networks** in the Lab to apply everything
+
+## Future Enhancements
+- Packet flow visualization
+- Network simulation with latency
+- Bandwidth utilization analytics
+- Interactive quiz assessments
+- Export network diagrams
+- Multi-player collaboration mode
+
+## Browser Support
+- Chrome/Edge 90+
+- Firefox 88+
+- Safari 14+
+
+## Contributing
+Contributions welcome! Please submit issues and pull requests.
+
+## License
+MIT License — See LICENSE file
+
+## Repository
+📦 [github.com/karthikrdy7/CN-Lab](https://github.com/karthikrdy7/CN-Lab)
+
+---
+
+**Made with ❤️ for network learners everywhere**
